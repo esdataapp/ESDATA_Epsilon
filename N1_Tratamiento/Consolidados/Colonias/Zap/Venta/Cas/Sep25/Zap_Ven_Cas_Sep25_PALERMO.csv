@@ -1,0 +1,7 @@
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap,__dup_key
+Sep25_46e68131,Inm24,Zap,Palermo,Ven,Cas,60.0,2.0,1.0,1399000.0,,-103.461945,20.816733,30.0,1.0,10,23316.666666666668,01/09/2025,Zap|Palermo|1399000.0|60.0|Cas
+Sep25_b82a2cc7,Inm24,Zap,Palermo,Ven,Cas,86.0,3.0,2.0,1599000.0,,-103.461945,20.816733,128.0,2.0,0,18593.023255813958,01/09/2025,Zap|Palermo|1599000.0|86.0|Cas
+Sep25_4df47c2f,Inm24,Zap,Palermo,Ven,Cas,46.0,2.0,2.0,1600000.0,,-103.463738,20.819343,23.0,1.0,13,34782.608695652176,01/09/2025,Zap|Palermo|1600000.0|46.0|Cas
+Sep25_b6b1cfdf,Inm24,Zap,Palermo,Ven,Cas,46.0,2.0,2.0,1150000.0,,-103.461937,20.816763,53.0,1.0,,25000.0,01/09/2025,Zap|Palermo|1150000.0|46.0|Cas
+Sep25_ccbd630e,Inm24,Zap,Palermo,Ven,Cas,200.0,3.0,2.0,1820000.0,,-103.463126,20.823853,38.0,2.0,8,9100.0,01/09/2025,Zap|Palermo|1820000.0|200.0|Cas
+Sep25_889801fd,Inm24,Zap,Palermo,Ven,Cas,140.0,4.0,2.0,2600000.0,,-103.461496,20.815695,60.0,3.0,14,18571.42857142857,01/09/2025,Zap|Palermo|2600000.0|140.0|Cas

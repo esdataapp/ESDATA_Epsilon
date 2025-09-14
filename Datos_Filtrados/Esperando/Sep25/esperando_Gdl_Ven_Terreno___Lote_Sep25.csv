@@ -1,0 +1,21 @@
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap,__dup_key
+Sep25_86595224,Inm24,Gdl,8 de Julio,Ven,Terreno / Lote,353.0,10.0,1.0,5800000.0,,-103.35397,20.644864,21.0,5.0,50,16430.594900849857,01/04/2025,Gdl|8 de Julio|5800000.0|353.0|Terreno / Lote
+Sep25_f2624217,Inm24,Gdl,Arcos,Ven,Terreno / Lote,649.0,2.0,,26500000.0,,-103.377609,20.667395,293.0,3.0,en construcción,40832.04930662558,01/04/2025,Gdl|Arcos|26500000.0|649.0|Terreno / Lote
+Sep25_c0945ed1,Inm24,Gdl,Arcos Vallarta,Ven,Terreno / Lote,464.0,8.0,4.0,14500000.0,,-103.383101,20.676811,110.0,4.5,50,31250.0,01/04/2025,Gdl|Arcos Vallarta|14500000.0|464.0|Terreno / Lote
+Sep25_1d4cce3b,Inm24,Gdl,Arcos Vallarta,Ven,Terreno / Lote,328.0,1.0,,20900000.0,,-103.380721,20.676701,311.0,1.0,20,63719.51219512195,01/04/2025,Gdl|Arcos Vallarta|20900000.0|328.0|Terreno / Lote
+Sep25_59e0280e,Inm24,Gdl,Circunvalación Oblatos,Ven,Terreno / Lote,1587.0,1.0,,22220000.0,,-103.300881,20.688878,,1.5,1,14001.260239445495,01/04/2025,Gdl|Circunvalación Oblatos|22220000.0|1587.0|Terreno / Lote
+Sep25_7cc8a88e,Inm24,Gdl,Del Fresno,Ven,Terreno / Lote,129.0,3.0,,2390000.0,,-103.369556,20.66019,17.0,1.0,40,18527.131782945737,01/04/2025,Gdl|Del Fresno|2390000.0|129.0|Terreno / Lote
+Sep25_2195e96c,Inm24,Gdl,Ladrón de Guevara,Ven,Terreno / Lote,345.0,4.0,,9500000.0,,-103.379779,20.681939,7.0,5.0,30,27536.23188405797,01/04/2025,Gdl|Ladrón de Guevara|9500000.0|345.0|Terreno / Lote
+Sep25_18dbb141,Inm24,Gdl,Lomas de Guevara,Ven,Terreno / Lote,700.0,5.0,,35000000.0,,-103.38206,20.689405,,5.0,1,50000.0,01/04/2025,Gdl|Lomas de Guevara|35000000.0|700.0|Terreno / Lote
+Sep25_adf5ae30,Inm24,Gdl,Moderna,Ven,Terreno / Lote,307.0,4.0,1.0,5800000.0,,-103.356687,20.66501,335.0,2.5,50,18892.50814332248,01/04/2025,Gdl|Moderna|5800000.0|307.0|Terreno / Lote
+Sep25_db4cbdf9,Inm24,Gdl,Obrera,Ven,Terreno / Lote,364.0,4.0,,10490000.0,,-103.374846,20.671299,,2.0,50,28818.68131868132,01/04/2025,Gdl|Obrera|10490000.0|364.0|Terreno / Lote
+Sep25_f0cfac22,Inm24,Gdl,Providencia,Ven,Terreno / Lote,400.0,4.0,3.0,14000000.0,,-103.37985,20.703423,14.0,4.5,30,35000.0,01/04/2025,Gdl|Providencia|14000000.0|400.0|Terreno / Lote
+Sep25_8a3991b1,Inm24,Gdl,Providencia 4a Sección,Ven,Terreno / Lote,400.0,5.0,6.0,22000000.0,,-103.384486,20.700519,,3.0,46,55000.0,01/04/2025,Gdl|Providencia 4a Sección|22000000.0|400.0|Terreno / Lote
+Sep25_c1deb565,Inm24,Gdl,San Juan Bosco,Ven,Terreno / Lote,170.0,3.0,,4240000.0,,-103.310824,20.677681,61.0,1.0,50,24941.176470588234,01/04/2025,Gdl|San Juan Bosco|4240000.0|170.0|Terreno / Lote
+Sep25_0f41db01,Inm24,Gdl,San Miguel de Mezquitán,Ven,Terreno / Lote,175.0,2.0,,4800000.0,,-103.357089,20.704448,109.0,3.0,0,27428.571428571428,01/04/2025,Gdl|San Miguel de Mezquitán|4800000.0|175.0|Terreno / Lote
+Sep25_2420a65b,Inm24,Gdl,San Miguel de Mezquitán,Ven,Terreno / Lote,455.0,3.0,1.0,7300000.0,,-103.354205,20.69934,,1.5,50,16043.956043956045,01/04/2025,Gdl|San Miguel de Mezquitán|7300000.0|455.0|Terreno / Lote
+Sep25_0e5d754e,Inm24,Gdl,Sutaj,Ven,Terreno / Lote,200.0,2.0,2.0,4500000.0,,-103.314038,20.650842,63.0,1.5,30,22500.0,01/04/2025,Gdl|Sutaj|4500000.0|200.0|Terreno / Lote
+Sep25_45989d08,Inm24,Gdl,Vallarta Norte,Ven,Terreno / Lote,446.0,3.0,3.0,9900000.0,,-103.389402,20.677282,109.0,3.0,30,22197.30941704036,01/04/2025,Gdl|Vallarta Norte|9900000.0|446.0|Terreno / Lote
+Sep25_59c30d06,Inm24,Gdl,Vallarta Poniente,Ven,Terreno / Lote,650.0,9.0,8.0,16500000.0,,-103.389344,20.672242,68.0,4.0,20,25384.615384615383,01/04/2025,Gdl|Vallarta Poniente|16500000.0|650.0|Terreno / Lote
+Sep25_e129c1b0,Inm24,Gdl,Villaseñor (Santa Teresita),Ven,Terreno / Lote,228.0,5.0,,7990000.0,,-103.368368,20.687081,52.0,1.0,80,35043.85964912281,01/04/2025,Gdl|Villaseñor (Santa Teresita)|7990000.0|228.0|Terreno / Lote
+Sep25_d5d440ff,Inm24,Gdl,Zona Centro,Ven,Terreno / Lote,400.0,5.0,2.0,9900000.0,,-103.355943,20.67956,34.0,2.0,30,24750.0,01/04/2025,Gdl|Zona Centro|9900000.0|400.0|Terreno / Lote

@@ -1,0 +1,8 @@
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap,__dup_key
+Sep25_292077df,Inm24,Zap,Camino Real,Ven,Dep,176.0,3.0,2.0,8150000.0,4000.0,-103.413624,20.67614,45.0,3.5,0,46306.81818181818,01/04/2025,Zap|Camino Real|8150000.0|176.0|Dep
+Sep25_430e51bd,Inm24,Zap,Camino Real,Ven,Dep,220.0,3.0,2.0,8000000.0,,-103.413507,20.676462,15.0,3.5,5,36363.63636363636,01/04/2025,Zap|Camino Real|8000000.0|220.0|Dep
+Sep25_bcc864ac,Inm24,Zap,Camino Real,Ven,Dep,177.0,3.0,2.0,8150000.0,4100.0,-103.413507,20.676462,24.0,3.5,0,46045.19774011299,01/04/2025,Zap|Camino Real|8150000.0|177.0|Dep
+Sep25_545c4d0f,Inm24,Zap,Camino Real,Ven,Dep,101.0,2.0,2.0,6190000.0,,-103.413807,20.676553,17.0,3.0,6,61287.12871287129,01/04/2025,Zap|Camino Real|6190000.0|101.0|Dep
+Sep25_f7086e7f,Inm24,Zap,Camino Real,Ven,Dep,128.0,2.0,2.0,6190000.0,,-103.413807,20.676553,16.0,3.0,7,48359.375,01/04/2025,Zap|Camino Real|6190000.0|128.0|Dep
+Sep25_5e2e1f1e,Inm24,Zap,Camino Real,Ven,Dep,102.0,2.0,2.0,6200000.0,,-103.413228,20.676172,65.0,2.0,6,60784.3137254902,01/04/2025,Zap|Camino Real|6200000.0|102.0|Dep
+Sep25_be684079,Inm24,Zap,Camino Real,Ven,Dep,128.0,2.0,2.0,6250000.0,3104.0,-103.413656,20.67705,34.0,3.0,7,48828.125,01/04/2025,Zap|Camino Real|6250000.0|128.0|Dep

@@ -1,0 +1,69 @@
+# --- Python bytecode / cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual environments ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- Package / build artifacts ---
+build/
+dist/
+*.egg-info/
+.eggs/
+.wheels/
+
+# --- Logs / debug ---
+*.log
+logs/
+
+# --- Jupyter / IPython ---
+.ipynb_checkpoints/
+
+# --- OS / Editor specific ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# --- Test / coverage ---
+.coverage
+htmlcov/
+.cache/
+.pytest_cache/
+.tox/
+
+# --- Tooling ---
+.mypy_cache/
+.pyre/
+.pytype/
+
+# --- Environment / secrets (add if used) ---
+.env
+.env.local
+.secrets/
+
+# --- Node (if any frontend assets) ---
+node_modules/
+
+# --- VSCode local settings (keep if you want to share) ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.sample.json
+
+# --- Data outputs (uncomment if you don't want to version results) ---
+# N5_Resultados/
+# Dashboard/CSV/
+# Supabase/ddl/*.log
+
+# --- Geo / large artifacts (adjust as needed) ---
+# *.geojson
+# *.parquet
+
+# --- Temporary ---
+*.tmp
+*.bak
+~$*

@@ -1,0 +1,236 @@
+###################################################################################################
+# LISTA DE VARIABLES ANALÍTICAS (DERIVADAS / METRICAS / FEATURES)                                 #
+# Proyecto: ESDATA_Epsilon                                                                         #
+# Objetivo: Catálogo estructurado para modelado, insights y preparación LLM                        #
+###################################################################################################
+
+Convenciones:
+- prefijo raw_: campo directo sin transformación adicional relevante.
+- prefijo feat_: variable derivada consolidada para modelos.
+- prefijo agg_: métricas agregadas (colonia / segmento / estrato).
+- prefijo flag_: indicadores booleanos de control / calidad / condición.
+- prefijo score_: escalas compuestas normalizadas (0–1 o 0–100).
+- prefijo txt_: variables textuales procesadas.
+- sufijo _pct: porcentaje (0–1), _pp: puntos porcentuales, _idx: índice relativo base=100.
+
+ÍNDICE (Secciones)
+ 1. Identificadores y Claves Técnicas
+ 2. Métricas Fundamentales (Listing Level)
+ 3. Derivadas Inmediatas
+ 4. Calidad, Outliers y Representatividad
+ 5. Estratificación y Segmentaciones
+ 6. Amenidades: Intensidad y Diferenciación
+ 7. Texto y Señales de Marketing
+ 8. Correlaciones y Relaciones Estructurales
+ 9. Series Temporales / Evolución (Placeholder)
+10. Scores Compuestos
+11. Variables Geoespaciales Enriquecidas (Futuras)
+12. Diccionario Resumido para LLM
+13. Backlog de Features Potenciales
+ 14. Matrices / Heatmaps / Efectos Amenidades
+
+===================================================================================================
+1. IDENTIFICADORES
+===================================================================================================
+raw_id_listado: ID original fuente.
+raw_fuente: portal / origen.
+feat_id_hash: hash estable combinando (ciudad, colonia, operacion, tipo, precio, area, lat, lon) para deduplicación.
+feat_key_colonia: llave normalizada ciudad||colonia||operacion||tipo_propiedad.
+feat_periodo: etiqueta temporal (AAAAMM o etiqueta campaña).
+
+===================================================================================================
+2. MÉTRICAS FUNDAMENTALES (NIVEL LISTING)
+===================================================================================================
+raw_precio: precio absoluto listado.
+raw_area_m2: superficie construida o útil (m²).
+feat_precio_m2: raw_precio / raw_area_m2 (manejo división segura, NaN -> null).
+raw_recamaras, raw_banos, raw_estacionamientos: atributos numéricos cardinales.
+raw_niveles, raw_antiguedad: atributos estructurales (si existen).
+raw_lat, raw_lon: coordenadas (WGS84).
+
+===================================================================================================
+3. DERIVADAS INMEDIATAS
+===================================================================================================
+feat_log_precio: log1p(raw_precio).
+feat_log_area: log1p(raw_area_m2).
+feat_log_precio_m2: log1p(feat_precio_m2).
+feat_area_bucket: bin categórico (definición consistente con area_stratification backend).
+feat_ratio_rec_area: raw_recamaras / raw_area_m2 (densidad recámaras).
+feat_ratio_banos_area: raw_banos / raw_area_m2.
+feat_precio_scaled: escalado robust (IQR) sobre raw_precio por tipo y operación.
+feat_area_scaled: idem para área.
+feat_precio_m2_scaled: robust scaling PxM2.
+feat_is_lux: flag heurístico precio_m2 > p90 segmento.
+feat_clasificacion_mercado: segmentación multicriterio (precio_m2 quantile + amenity richness + ubicación) -> {"Entry","Core","Upper","Prime"}.
+feat_precio_m2_pct_ciudad: percentil global ciudad del listing (0–100).
+feat_precio_m2_pct_tipo_oper: percentil dentro (ciudad, tipo, operacion).
+
+===================================================================================================
+4. CALIDAD / OUTLIERS / REPRESENTATIVIDAD
+===================================================================================================
+flag_outlier_precio: IQR rule (1.5*IQR outside) por grupo (ciudad-tipo-operacion).
+flag_outlier_area: igual que precio, aplicado a raw_area_m2.
+flag_outlier_precio_m2: rule compuesta (IQR + hard bounds configurables).
+feat_outlier_intensity: suma ponderada(flags) normalizada (0–1).
+agg_n_listados_colonia: conteo listings colonia.
+flag_rep_min5: agg_n_listados_colonia >=5.
+flag_rep_min10: agg_n_listados_colonia >=10.
+flag_rep_min30: agg_n_listados_colonia >=30.
+feat_rep_tier: {"LOW","MID","HIGH"} según cortes ( <10 / 10–29 / >=30 ).
+feat_pct_outliers_colonia: outliers / total colonia.
+feat_iqr_ratio_colonia: pxm2_iqr / pxm2_mediana (robust dispersion).
+feat_price_spread_ratio: (pxm2_q75 - pxm2_q25) / pxm2_q50.
+feat_stability_sample_colonia: función invertida de (cv + |skew|) escalada 0–1.
+
+===================================================================================================
+5. ESTRATIFICACIÓN / SEGMENTACIONES
+===================================================================================================
+feat_area_stratum: etiqueta bin (ej. (0,45], (45,70], etc.).
+agg_mediana_precio_m2_stratum_colonia: mediana PxM2 por (colonia, stratum).
+agg_n_stratum_colonia: volumen soporte para cada bin.
+feat_stratum_rep_flag: agg_n_stratum_colonia >= threshold (default 5).
+agg_mediana_area_colonia: mediana área en colonia.
+agg_iqr_area_colonia: IQR área colonia.
+feat_area_position_pct: percentil relativo del listing dentro distribución área colonia.
+feat_precio_position_pct: percentil relativo en precio.
+feat_area_cluster_label: cluster k-means (k configurable) sobre log(area) + recamaras opcional.
+feat_composite_segment: concatenación estrato_area + clasificacion_mercado.
+
+===================================================================================================
+6. AMENIDADES – INTENSIDAD Y DIFERENCIACIÓN
+===================================================================================================
+agg_ratio_amenidad_colonia_<amenidad>: (# listings con amenidad / total colonia).
+agg_ratio_amenidad_global_<amenidad>: (# listings con amenidad / total universo filtrado periodo).
+feat_amenity_lift_<amenidad>: ratio_colonia / ratio_global.
+feat_amenity_presence_count: número total de amenidades presentes (suma booleanas).
+feat_top_diff_amenity: amenidad con mayor lift>1.2 (si existe).
+feat_amenity_diversity_idx: Shannon entropy sobre vector binario amenidades presentes.
+amenity_area_effect_<amenidad>: (mediana_area_present - mediana_area_absent) global o por colonia (según disponibilidad de n>=5 en ambos grupos).
+amenity_price_effect_<amenidad>: (mediana_pxm2_present - mediana_pxm2_absent).
+amenity_price_effect_pct_<amenidad>: efecto relativo / mediana_pxm2_absent.
+amenity_confidence_<amenidad>: min(n_present, n_absent) / threshold_min (clipped 0–1) para robustez del efecto.
+
+===================================================================================================
+7. TEXTO / MARKETING
+===================================================================================================
+raw_titulo, raw_descripcion: campos originales.
+feat_len_desc: longitud tokens limpieza básica.
+feat_len_desc_ratio: feat_len_desc / raw_area_m2 (densidad descriptiva).
+feat_marketing_keyword_count: conteo de términos marketing (lista controlada).
+feat_marketing_intensity_idx: normalización min-max de keyword_count.
+agg_tf_token_tercil_pxM2: tercil (LOW/MID/HIGH) de mediana PxM2 para token.
+feat_tfidf_topk_tokens: lista (k=5–10) tokens con TF-IDF más alto por listing (o colonia) filtrando stopwords.
+feat_semantic_vector (FUTURO): embedding (modelo sentence-transformer) descripción.
+feat_similarity_cluster (FUTURO): label cluster semántico.
+
+===================================================================================================
+8. CORRELACIONES / RELACIONES
+===================================================================================================
+agg_corr_area_precio: Pearson global.
+agg_corr_area_precio_m2: Pearson global.
+agg_corr_colonia_area_precio: por colonia (filtrando n>=min_n).
+agg_corr_area_recamaras, agg_corr_area_banos: correlaciones estructurales.
+feat_colonia_corr_rank: ranking relativo de colonia por |corr_area_precio|.
+feat_stability_corr_colonia: (1 - std bootstrap corr) escala 0–1 (FUTURO).
+agg_corr_matrix_num_vars: matriz (serializada JSON) correlaciones Pearson variables num clave (precio, area, recamaras, estacionamientos, pxm2, mantenimiento).
+agg_spearman_matrix_num_vars: matriz Spearman (para monotonicidad). 
+feat_multi_collinearity_alert: flag si VIF>umbral en conjunto base.
+feat_partial_corr_area_precio: correlación parcial controlando recámaras y estacionamientos (FUTURO).
+
+===================================================================================================
+9. SERIES TEMPORALES / EVOLUCIÓN (PLACEHOLDER)
+===================================================================================================
+agg_pxm2_mes_colonia: mediana mensual PxM2 (requiere histórico >=3 meses).
+agg_trend_pxm2_colonia: pendiente regresión lineal simple último N meses.
+feat_trend_class: {"UP","FLAT","DOWN"} con umbrales ±ε.
+feat_volatility_pxm2_colonia: std(PxM2) / media PxM2 periodo ventana.
+
+===================================================================================================
+10. SCORES COMPUESTOS
+===================================================================================================
+score_confianza_colonia: función f(volumen, pct_outliers, iqr_ratio, cv) -> 0–100.
+feat_iqr_ratio_precio: IQR_precio / mediana_precio.
+feat_cv_precio: std / media (clipped).
+score_amenity_differentiation: media normalizada top-k lifts >1.
+score_text_marketing: combinación ponderada (keyword_intensity + densidad + diversidad tokens).
+score_calidad_listing: agregación (no nulos clave, ausencia outliers fuertes, texto suficiente).
+score_comercial_attr: mezcla (amenidades premium + marketing + posicionamiento PxM2).
+score_confidence_colonia_v2: versión extendida = f(n, iqr_ratio, cv, |skew|, pct_outliers) calibrada 0–100.
+score_listing_quality_v2: f(completitud_campos, !outliers_fuertes, longitud_texto_normalizada, amenidad_diversity_idx).
+score_market_position: ranking percentil de pxm2 dentro de su tipo/operación en la ciudad (0–100).
+
+===================================================================================================
+11. GEOESPACIAL (FUTURO)
+===================================================================================================
+feat_dist_centroide_colonia: distancia a centroide ciudad.
+feat_cluster_geo_label: cluster DBSCAN/HDBSCAN.
+feat_neighbor_premium_idx: media PxM2 colonias vecinas / media PxM2 ciudad.
+feat_accessibility_score: combinación (dist a vías principales, equipamiento).
+
+===================================================================================================
+12. DICCIONARIO RESUMIDO LLM
+===================================================================================================
+FORMATO JSON SUGERIDO (ejemplo conceptual):
+{
+  "feat_precio_m2": {"tipo": "float", "descripcion": "Precio por metro cuadrado", "origen": "raw_precio/raw_area_m2", "nivel": "listing", "sensibilidad": "media"},
+  "feat_amenity_lift_alberca": {"tipo": "float", "descripcion": "Relación de prevalencia de alberca colonia vs global", "nivel": "colonia", "rango": ">=0"},
+  "score_confianza_colonia": {"tipo": "int", "descripcion": "Calidad estadística de la colonia", "escala": "0-100"}
+}
+Recomendaciones:
+- Mantener versión (schema_version) y fecha.
+- Incluir campos: tipo_dato, formula, dependencias, n_min_requerido.
+- Marcar sensibilidad (baja/media/alta) para controles de privacidad.
+
+===================================================================================================
+13. BACKLOG FUTURO DE FEATURES
+===================================================================================================
+- feat_price_residual: residual de modelo de regresión base (detecta sobre/infra valoración).
+- score_rarity_amenities: penaliza / premia combinaciones poco frecuentes.
+- feat_text_sentiment: polaridad TextBlob o transformer.
+- feat_readability_idx: legibilidad (Flesch adaptado español).
+- feat_temporal_listing_age: días en mercado (si se consigue fecha publicación).
+- feat_upgrade_potential: gap (mediana_pxM2_ciudad - pxm2_colonia) > umbral.
+- feat_price_elasticity_proxy: variación precio vs volumen mes a mes.
+- feat_sparse_amenity_vector: vector binario comprimido (embedding disperso) para similitud.
+- score_investment: combinación (tendencia + volatility inversa + upgrade_potential).
+ - feat_spatial_autocorr_pxm2: índice Moran's I para detectar clusters espaciales de precio.
+ - feat_temporal_volatility_idx: GARCH proxy o rolling std multi-periodo.
+ - feat_price_liquidity_proxy: tiempo_publicacion inverso ajustado por segmento.
+ - feat_cross_amenity_synergy: interacción amenidades (ej. alberca+gimnasio elevan prima combinada).
+ - feat_semantic_sentiment_robusto: ensemble transformer + léxico.
+
+===================================================================================================
+14. MATRICES / HEATMAPS / EFECTOS AMENIDADES
+===================================================================================================
+Contexto: Algunas salidas analíticas generan estructuras agregadas (matrices, diccionarios serializados) para visualización (ej. dashboard) y análisis profundo.
+
+heatmap_pxm2_colonia_area_bin: tabla pivote (colonia vs estrato_area) con mediana pxm2. En CSV almacenada como columnas dinámicas mediana_pxm2_(estrato_label).
+heatmap_conteo_colonia_area_bin: versión conteo n_(estrato_label).
+matrix_corr_num_json: JSON serializado de correlaciones numéricas (equivalente agg_corr_matrix_num_vars).
+amenity_effects_json: JSON por amenidad con diff_mediana, lift, n_present, n_absent, confidence.
+area_strata_stats_json: definición dinámica de bins (límites y etiquetas) para reproducibilidad.
+
+Notas implementación:
+- Serialización en JSON (utf-8) almacenada en campo TEXT si se persiste.
+- Validar tamaño < 1MB por objeto para mantener eficiencia.
+- Para reconstruir heatmap se filtran columnas que siguen patrón mediana_pxm2_*, n_*.
+
+Requisitos mínimos n:
+- Correlaciones colonia: n>=10.
+- Efecto amenidad: n_present>=5 y n_absent>=5.
+- Stratificación área-colonia: cada bin n>=3 para mostrar públicamente; se pueden ocultar bins incompletos.
+
+Calidad / confianza:
+- confidence_score_colonia = w1*f(n) + w2*f(dispersión) + w3*f(sesgo) + w4*(1-pct_outliers) (weights calibrados y documentados en ANALISIS_AREA_M2.md).
+
+
+===================================================================================================
+NOTAS DE IMPLEMENTACIÓN
+===================================================================================================
+1. Validar null safety antes de construir derivadas (evitar cascadas de NaN).
+2. Para correlaciones por colonia usar filtro consistente n>=10 (ajustar por robustez).
+3. Normalizaciones: preferir RobustScaler (mediana/IQR) sobre StandardScaler por heavy tails.
+4. Versionar catálogos en carpeta docs/schema/ (propuesto) con convención schema_<AAAAMMDD>.json.
+5. Para LLM: generar vista plana (wide) + metadatos para prompt controlado.
+
+FIN DEL DOCUMENTO.

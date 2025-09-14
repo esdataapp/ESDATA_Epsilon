@@ -1,0 +1,4 @@
+﻿Periodo,Ciudad,Operacion,Tipo,Colonia,n,precio_representativo,precio_min,precio_max,precio_skew,precio_metodo,area_m2_representativo,area_m2_min,area_m2_max,area_m2_skew,area_m2_metodo,PxM2_representativo,PxM2_min,PxM2_max,PxM2_skew,PxM2_metodo
+Sep25,Gdl,Ven,Ofc,Circunvalación Vallarta,5,20700000.0,8650000.0,49700000.0,1.6237621035207457,mediana_rango,225.0,160.0,1214.0,2.0887029977032676,mediana_rango,54062.5,30416.666666666668,95391.70506912442,0.2708967093965004,mediana_rango
+Sep25,Gdl,Ven,Ofc,Country Club,8,10322500.0,6258000.0,72000000.0,2.7166751429662126,mediana_rango,152.0,100.0,1200.0,2.80928026279591,mediana_rango,63790.0,60000.0,107594.93670886075,2.0682672733258687,mediana_rango
+Sep25,Gdl,Ven,Ofc,Ladrón de Guevara,7,15348523.0,14346976.0,15835778.0,-0.3457206793236232,mediana_rango,252.0,193.0,300.0,0.10875098718034769,mediana_rango,60906.838461538464,51161.74333333333,74595.85492227979,-0.05577486747363093,mediana_rango

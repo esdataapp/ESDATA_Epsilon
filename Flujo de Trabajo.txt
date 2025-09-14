@@ -1,0 +1,334 @@
+###################################################################################################
+# FLUJO DE TRABAJO (PIPELINE END-TO-END)                                                          #
+# Proyecto: ESDATA_Epsilon                                                                        #
+# Objetivo: Documentar exhaustivamente cada etapa del pipeline para reconstrucción, QA y adopción #
+#           por analistas, ingenieros de datos y modelos LLM (context packs).                     #
+###################################################################################################
+
+ÍNDICE
+ 0. Principios del Pipeline
+ 1. Estructura de Carpetas (Layout de Datos)
+ 2. Convenciones de Nomenclatura
+ 3. Variables Globales / Configuración
+ 4. Pasos del Pipeline (1–10) – Especificación Técnica
+ 5. Reglas de Calidad y Validaciones Transversales
+ 6. Derivación de Métricas Colonias (Nivel 1)
+ 7. Exportación Jerárquica / Separación por Colonias
+ 8. Estadística y Reglas de Representatividad
+ 9. Amenidades & Texto – Enriquecimiento Avanzado
+10. Integración con Dashboard
+11. Logs, Auditoría y Trazabilidad
+12. Optimización / Performance
+13. Roadmap / Backlog
+
+===================================================================================================
+0. PRINCIPIOS DEL PIPELINE
+===================================================================================================
+P0 Idempotencia: Re-ejecutar mismos inputs produce mismos outputs (hash de ID estable).
+P1 Transparencia: Cada eliminación cae a carpeta `Datos_Filtrados/<tipo>/Periodo/`.
+P2 Separación de responsabilidades: Limpieza != Enriquecimiento != Agregación.
+P3 Mantenibilidad: Código organizado por dominios (geo, texto, estadística, core).
+P4 Observabilidad: Contadores clave (n_in, n_out, duplicados, invalidos, esperando) se loggean.
+P5 Reversibilidad: Nunca sobrescribir outputs finales; versionar con sufijo periodo.
+
+===================================================================================================
+1. ESTRUCTURA DE CARPETAS
+===================================================================================================
+Base_de_Datos/               # CSV crudos por período (entrada primaria)
+Datos_Filtrados/
+    Eliminados/Periodo/        # Sin precio/area o sin colonia (según paso)
+    Duplicados/Periodo/        # Registros descartados por colisión hash / heurística
+    Esperando/Periodo/         # Colonias < umbral (5) para acumulación temporal
+N1_Tratamiento/
+    Consolidados/              # Outputs intermedios 1–6
+        Colonias/                # Estructura jerárquica por ciudad/operacion/tipo/periodo
+    Geolocalizacion/
+        Colonias/                # GeoJSON de referencia
+        Motor/                   # Objetos auxiliares (índices espaciales, caches)
+N2_Estadisticas/ (F1 Analítica descriptiva)
+    Estudios/
+    Resultados/
+    Reportes/
+N3_Correlaciones/
+N4_Analisis_Temporal/
+N5_Resultados/
+    Nivel_1/CSV/               # Bases finales (0.Final_*) y tablas colonia nivel 1
+    Nivel_2/CSV/               # (Reservado para agregaciones superiores)
+    ...
+Dashboard/CSV/<Periodo>/     # Artefactos derivados para app Streamlit
+
+===================================================================================================
+2. CONVENCIONES DE NOMENCLATURA
+===================================================================================================
+<Paso>.<Nombre>_<Periodo>.csv  (ej: 1.Consolidado_Adecuado_Sep25.csv)
+0.Final_Num_<Periodo>.csv      (base numérica final)
+0.Final_Ame_<Periodo>.csv      (amenidades binarias + texto estructurado)
+0.Final_MKT_<Periodo>.csv      (texto marketing enriquecido)
+Colonias separadas: Ciudad_Oper_Tipo_Periodo_COL<ABRV>.csv (ABRV <=7 chars)
+Tablas representatividad: <Ciudad>_<Oper>_<Tipo>_<Periodo>_inicial.csv / _final.csv
+
+===================================================================================================
+3. VARIABLES GLOBALES / CONFIG
+===================================================================================================
+UMBRAL_COLONIA_MIN = 5
+OUTLIER_RULES = {"precio":{"pct_upper":0.99,"mult":5},"area_m2":{"abs_max":2000}}
+HASH_SEMILLA = ["PaginaWeb","codigo_inmuebles24","precio","area_m2","recamaras","Fecha_Scrap"]
+PERIOD_FORMAT = 'MMMYY' (Sep25)
+
+===================================================================================================
+4. PASOS DEL PIPELINE – ESPECIFICACIÓN
+===================================================================================================
+--- PASO 1: CONSOLIDAR & ADECUAR ---
+Archivo: step1_consolidar_adecuar.py
+Entradas: Base_de_Datos/*.csv + Datos_Filtrados/Esperando/<Periodo-1>/*.csv (append opcional)
+Salidas: 1.Consolidado_Adecuado_<Periodo>.csv
+Acciones:
+    a) Enumerar archivos origen: glob(Base_de_Datos/<Periodo>/*.csv) + (opcional) Datos_Filtrados/Esperando/<Periodo-1>/*.csv
+    b) Leer incremental (pd.read_csv) acumulando en lista; validar columnas mínimas: ['precio','area_m2','operacion','tipo_propiedad']
+    c) Unificar nombres de columnas usando diccionario de mapeo (ej: 'Precio MN' -> 'precio')
+    d) Normalizar encoding: intentar utf-8; si error -> latin1 decode -> re-encode utf-8
+    e) Limpiar caracteres anómalos: regex sustitución en texto (\r, \n, \t, caracteres de control)
+    f) Convertir tipos básicos (precio -> float parse; area -> float; recamaras/banos -> int seguro con fillna(0))
+    g) Derivar columnas auxiliares: Banos_totales = banos + 0.5*medio_banos (si existen), PxM2_prelim = precio/area_m2 (filtrar area>0)
+    h) ID hash: hash = sha1('|'.join([PaginaWeb,codigo_inmuebles24,precio,area_m2,recamaras,Fecha_Scrap]))[:16]
+         - Resolver colisiones: mantener primer registro, a los siguientes añadir sufijo incremental _1, _2...
+    i) Extraer lat/lon: si existe 'ubicacion_url' -> regex 'center=lat,lon'; castear floats (6 decimales) -> lat, lon
+    j) Guardar DataFrame consolidado en: N1_Tratamiento/Consolidados/1.Consolidado_Adecuado_<Periodo>.csv
+    k) Log JSONL: step=1, n_in, n_archivos, n_ids_unicos, duration_ms
+ Pseudocódigo:
+         files = glob(Base_de_Datos/<Periodo>/*.csv)
+         dfs = [read_and_clean(f) for f in files]
+         df = concat(dfs)
+         df['id_hash'] = build_hash(df)
+         df.to_csv(N1_Tratamiento/Consolidados/1.Consolidado_Adecuado_<Periodo>.csv)
+ No elimina registros. Log: n_in, n_cols, n_ids_unicos
+Errores críticos: Falta columnas mínimas -> abort
+
+--- PASO 2: PROCESAMIENTO GEOESPACIAL ---
+Archivo: step2_procesamiento_geoespacial.py
+Entrada: 1.Consolidado_Adecuado_<Periodo>.csv
+Salida: 2.Consolidado_ConColonia_<Periodo>.csv
+Acciones:
+    a) Localiza insumos geo:
+        - Ruta base geo: N1_Tratamiento/Geolocalizacion/Colonias/
+        - Esperado: un archivo por ciudad (ej: colonias-Guadalajara.geojson, colonias-Zapopan.geojson)
+        - Validar existencia (si falta -> log error y abort)
+    b) Construye índice espacial:
+        - Leer cada geojson a GeoDataFrame (gpd.read_file)
+        - Estandarizar columnas: ['colonia','ciudad','geometry'] (renombrar si difiere)
+        - Unir geodataframes en uno (geo_all)
+        - Crear STRtree: from shapely.strtree import STRtree; tree = STRtree(geo_all.geometry.values)
+        - Mapear: geom_id -> (ciudad, colonia)
+    c) Cargar dataset de paso 1 desde: N1_Tratamiento/Consolidados/1.Consolidado_Adecuado_<Periodo>.csv
+        - Validar existencia de columnas lat, lon (si faltan -> derivar desde 'ubicacion_url' si disponible)
+        - Convertir a puntos: df.apply(Point(lon, lat))
+    d) Para cada punto listing:
+        - Query árbol: candidates = tree.query(point)
+        - Filtrar candidate whose polygon.contains(point)
+        - Si múltiples (raro): seleccionar el de menor área o primero según orden stable
+        - Guardar ciudad, colonia asignada; si ninguno -> flag sin_colonia
+    e) Normalizar nombre colonia: lower -> strip -> title -> remover acentos (opcional) -> slug (para export granular posterior)
+    f) Persistir resultado en: N1_Tratamiento/Consolidados/2.Consolidado_ConColonia_<Periodo>.csv
+    g) Exportar registros sin_colonia a: Datos_Filtrados/Eliminados/<Periodo>/sin_colonia.csv
+    h) Métricas log (JSONL): step=2, n_in, n_match, n_sin_colonia, duration_ms, geo_files_used
+ Pseudocódigo:
+        geo_files = glob(Geolocalizacion/Colonias/*.geojson)
+        geo_all = concat([read(f) for f in geo_files])
+        tree = STRtree(geo_all.geometry)
+        for row in df_listings:
+           pt = Point(row.lon, row.lat)
+           for poly in tree.query(pt):
+              if poly.contains(pt): assign colonia/ciudad; break
+           else: flag sin_colonia
+        write outputs
+ Log: n_match, n_sin_colonia, tiempo_spatial_join, geo_files_count
+
+--- PASO 3: VERSIONES ESPECIALES (NUM / TEXTO) ---
+Archivo: step3_versiones_especiales.py
+Entrada: 2.Consolidado_ConColonia_<Periodo>.csv
+Salidas: 3a.Consolidado_Num_<Periodo>.csv / 3b.Consolidado_Tex_<Periodo>.csv
+ Acciones:
+    a) Cargar: N1_Tratamiento/Consolidados/2.Consolidado_ConColonia_<Periodo>.csv
+    b) Definir listas:
+        NUMERIC_COLS = [... precio, area_m2, recamaras, banos, estacionamientos, lat, lon, PxM2_prelim ...]
+        TEXT_COLS = [... titulo, descripcion, caracteristicas, servicios, amenidades, exteriores ...]
+    c) Subset df_num = df[NUMERIC_COLS + claves_identidad]
+    d) Subset df_tex = df[TEXT_COLS + claves_identidad]
+    e) Persistir en: N1_Tratamiento/Consolidados/3a.Consolidado_Num_<Periodo>.csv y 3b.Consolidado_Tex_<Periodo>.csv
+    f) Log: step=3, n_rows, n_num_cols, n_text_cols
+
+--- PASO 4: ANÁLISIS TEXTO & AMENIDADES PRIMARIO ---
+Archivo: step4_analisis_variables_texto.py
+Entradas: 3b.Consolidado_Tex_<Periodo>.csv
+Salidas: 4a.Tex_Titulo_Descripcion_<Periodo>.csv / 4b.Tex_Car_Ame_Ser_Ext_<Periodo>.csv
+Acciones:
+    a) Limpieza básica (lower, quitar html, normalizar tildes)
+    b) Extracción de keywords mapeadas a variables binarias (catálogos)
+    c) Conteos de tokens; longitud; flags marketing (exclusivo, premium, lujo...)
+    d) Catálogo amenidades -> columnas binarias (ver Diccionario Variables)
+    e) Persistir outputs en: N1_Tratamiento/Consolidados/4a.Tex_Titulo_Descripcion_<Periodo>.csv y 4b.Tex_Car_Ame_Ser_Ext_<Periodo>.csv
+    f) Log: step=4, n_rows, vocab_size, n_amenidades_binarias
+
+--- PASO 5: ANÁLISIS LÓGICO & CORROBORACIÓN ---
+Archivo: step5_analisis_logico_corroboracion.py
+Entradas: 3a.Consolidado_Num_<Periodo>.csv + 4a.Tex_Titulo_Descripcion_<Periodo>.csv
+Salida: 5.Num_Corroborado_<Periodo>.csv + Eliminados/
+Acciones:
+    a) Validaciones rango duro/blando (precio, area)
+    b) Imputaciones guiadas (recamaras vs recamaras_icon)
+    c) Cruce con texto para rellenar campos vacíos (regex heurísticas)
+    d) Registros sin precio o area válidos -> Datos_Filtrados/Eliminados
+    e) Persistir base depurada: N1_Tratamiento/Consolidados/5.Num_Corroborado_<Periodo>.csv
+    f) Exportar removidos: Datos_Filtrados/Eliminados/<Periodo>/sin_valores_clave.csv
+    g) Log: step=5, n_in, n_out, n_eliminados, pct_eliminados
+
+--- PASO 6: REMOVER DUPLICADOS & UNIFICAR AMENIDADES ---
+Archivo: step6_remover_duplicados.py
+Entradas: 5.Num_Corroborado_<Periodo>.csv + 4a + 4b
+Salidas: 0.Final_Num_<Periodo>.csv / 0.Final_MKT_<Periodo>.csv / 0.Final_Ame_<Periodo>.csv + Duplicados/
+Acciones:
+    a) Deduplicación por ID hash + heurística (misma colonia, ±2% precio, ±2 m2 área)
+    b) Recalcular PxM2 definitivo
+    c) Sincronizar subset marketing y amenidades manteniendo sólo IDs finales
+    d) Exportar duplicados detectados: Datos_Filtrados/Duplicados/<Periodo>/duplicados.csv
+    e) Persistir finales en: N5_Resultados/Nivel_1/CSV/0.Final_Num_<Periodo>.csv (+ Ame + MKT)
+    f) Log: step=6, n_in, n_final, n_duplicados
+
+--- PASO 7: ESTADÍSTICAS F1 (DESCRIPTIVO / OUTLIERS / NORMALIDAD) ---
+Scripts: F1_Descriptivo, F1_Outliers, F1_Norm (+ _Rep) sobre 0.Final_Num
+Salidas: Archivos en N2_Estadisticas/(Estudios|Resultados|Reportes)
+Acciones: Descriptivos precio, area_m2, PxM2; outliers IQR; normalidad (Shapiro / Kolmogorov si n<5000, jarque-bera caso contrario)
+ Detalle:
+     a) Input principal: N5_Resultados/Nivel_1/CSV/0.Final_Num_<Periodo>.csv
+     b) Script F1_Descriptivo produce: N2_Estadisticas/Resultados/descriptivo_<Periodo>.csv
+     c) Script F1_Outliers produce: N2_Estadisticas/Resultados/outliers_<Periodo>.csv + flags
+     d) Script F1_Norm produce: N2_Estadisticas/Resultados/normalidad_<Periodo>.csv
+     e) Versiones _Rep agregan columnas representatividad si aplica
+     f) Log: step=7, n_rows, n_outliers, normal_tests_executed
+ Pseudocódigo resumido:
+            df = read(0.Final_Num)
+            stats = df.groupby(grupo_cols).agg(...)
+            outliers = iqr_detect(df, vars=['precio','area_m2','PxM2'])
+            normal = run_normal_tests(df, var='PxM2')
+            write outputs
+
+--- PASO 8: TABLAS RESUMEN COLONIA ---
+Archivo: step8_resumen_colonias.py
+Entrada: 0.Final_Num_<Periodo>.csv
+Salidas: *_inicial.csv (todas colonias) / *_final.csv (colonias n>=UMBRAL_COLONIA_MIN con método representativo)
+Campos: n, precio_{min,med,mean,max}, area_m2_{min,med,mean,max}, PxM2_{min,med,mean,max}, metodo_precio, metodo_area, metodo_pxm2
+Método: Árbol de decisión (ver README) basado en n y skewness.
+Colonias n<UMBRAL -> mover registros a Esperando/<Periodo>/ para futura consolidación.
+ Detalle:
+    a) Input: N5_Resultados/Nivel_1/CSV/0.Final_Num_<Periodo>.csv
+    b) Agrupar por ['ciudad','colonia','operacion','tipo_propiedad']
+    c) Calcular métricas y skewness PxM2 -> decidir método
+    d) Guardar inicial en: N5_Resultados/Nivel_1/CSV/<Ciudad>_<Oper>_<Tipo>_<Periodo>_inicial.csv (o consolidado global)
+    e) Filtrar n>=UMBRAL -> final -> *_final.csv
+    f) Registros de colonias n<UMBRAL -> copiar a Datos_Filtrados/Esperando/<Periodo>/
+    g) Log: step=8, n_colonias, n_final, n_esperando
+
+--- PASO 9: SEPARACIÓN POR COLONIAS (EXPORT GRANULAR) ---
+Archivo: step9_separar_colonias.py
+Entrada: 0.Final_Num_<Periodo>.csv
+Salida: Jerarquía en N1_Tratamiento/Consolidados/Colonias/<Ciudad>/<Operacion>/<Tipo>/<Periodo>/Ciudad_Oper_Tipo_Periodo_COLXXXX.csv
+Regla: Sólo colonias n>=UMBRAL. Abreviatura nombre colonias mediante función slug shorten.
+ Detalle:
+    a) Input: N5_Resultados/Nivel_1/CSV/0.Final_Num_<Periodo>.csv
+    b) Obtener lista colonias válidas de *_final.csv (paso 8)
+    c) Para cada colonia válida filtrar subset y exportar CSV individual
+    d) Generar abreviatura: toma primeras letras significativas sin vocales repetidas (función shorten)
+    e) Guardar en: N1_Tratamiento/Consolidados/Colonias/<Ciudad>/<Oper>/<Tipo>/<Periodo>/...
+    f) Log: step=9, n_archivos_generados, total_rows_exported
+
+--- PASO 10: MÉTODOS REPRESENTATIVOS / CONSISTENCIA ---
+Archivo: step10_metodos_representativos.py
+Entrada: 0.Final_Num_<Periodo>.csv
+Salida: metodos_representativos_<Periodo>.csv
+Acciones: Consolidar qué método (media, mediana) fue elegido por variable y colonia + métricas de dispersión.
+ Detalle:
+    a) Input: outputs *_final.csv del paso 8 (o reconstruir agregando 0.Final)
+    b) Para cada variable objetivo (precio, area_m2, PxM2) leer método decidido (árbol) + métricas soporte (n, skew, cv, iqr_ratio)
+    c) Construir tabla final: ciudad, colonia, operacion, tipo_propiedad, metodo_precio, metodo_area, metodo_pxm2, motivos (json corto)
+    d) Guardar en: N5_Resultados/Nivel_1/CSV/metodos_representativos_<Periodo>.csv
+    e) Validar consistencia: si metodo_precio == 'media' pero skew>1.5 -> log warning
+    f) Log: step=10, n_colonias, pct_media, pct_mediana, warnings
+
+===================================================================================================
+5. CALIDAD Y VALIDACIONES TRANSVERSALES
+===================================================================================================
+Checks:
+    - conteo_ids_unicos == len(df) tras paso 6
+    - % duplicados <= 5% (warn si >5, error si >15)
+    - % sin_colonia <= 2% (meta)
+    - PxM2 recomputable == stored PxM2 (delta relativo < 1e-6)
+    - Log de outliers por variable < 1% extremo (precio_outlier_extreme_flag)
+
+===================================================================================================
+6. MÉTRICAS COLONIAS NIVEL 1
+===================================================================================================
+Generadas en step8 + dashboard generator:
+    - colony_stats: n, precio_mediana, PxM2_mediana, area_m2_mediana, iqr_pxM2, cv_pxM2
+    - quantiles por colonia (p10,p25,p50,p75,p90) para precio, area_m2, PxM2
+    - outliers_flagged (variable, id, límites)
+
+===================================================================================================
+7. EXPORTACIÓN JERÁRQUICA
+===================================================================================================
+Ruta: N1_Tratamiento/Consolidados/Colonias/<Ciudad>/<Operacion>/<Tipo>/<Periodo>/...
+Uso: Entradas para geospatial join posterior / dashboards específicos.
+
+===================================================================================================
+8. REPRESENTATIVIDAD / REGLAS (ÁRBOL)
+===================================================================================================
+Ver README (copiado allí). Implementación: función classify_representativity(n, skew) -> {"media","mediana","mediana+IQR","no_estadistica"}.
+Skewness: scipy.stats.skew sobre PxM2.
+
+===================================================================================================
+9. AMENIDADES Y TEXTO – ENRIQUECIMIENTO
+===================================================================================================
+Amenidades: lift = ratio_colonia / ratio_global (persistir amenity_prevalence.csv).
+Texto marketing: TF-IDF segmentado por terciles de PxM2 (alto / medio / bajo).
+Puntaje confianza colonia: volumen + pct_outliers + iqr_ratio + cv (score 0–100, bandas).
+
+===================================================================================================
+10. INTEGRACIÓN DASHBOARD
+===================================================================================================
+Script generador: generate_dashboard_data.py crea artefactos:
+    colony_stats.csv, colony_quantiles.csv, outliers_flagged.csv, price_area_heatmap_long/matrix.csv,
+    colony_distribution_long.csv, amenity_prevalence.csv, marketing_signals.csv, pxm2_evolution_stub.csv.
+App (app.py): Secciones KPIs, Outliers, Amenidades, Texto/Marketing, Geoespacial, Área Exhaustiva.
+
+===================================================================================================
+11. LOGS / AUDITORÍA
+===================================================================================================
+Formato recomendado JSONL:
+{"step":1,"period":"Sep25","n_in":12345,"n_out":12345,"ts":"2025-09-13T10:12:00Z"}
+Campos comunes: step, period, n_in, n_out, duration_ms, warnings_count, errors_count, qc_flags.
+Persistir en logs/pipeline_<Periodo>.jsonl
+
+===================================================================================================
+12. OPTIMIZACIÓN / PERFORMANCE
+===================================================================================================
+- Usar lectura incremental (chunksize) si Base_de_Datos > 2M filas.
+- Índice espacial persistente (pickle STRtree) para acelerar paso 2.
+- Reutilizar TF-IDF vocabulary entre períodos para estabilidad.
+- Sampling controlado en dashboard (limit 50k para análisis área pesada).
+
+===================================================================================================
+13. ROADMAP / BACKLOG
+===================================================================================================
+SHORT TERM:
+    - Añadir script análisis amenidades profundo (cluster amenidades, co-ocurrencias)
+    - Spearman correlations colonias (robustez)
+    - Validación schema automática (pydantic dataclasses)
+MID TERM:
+    - Embeddings unificados (titulo + descripcion) almacenados en parquet
+    - Modelo de recomendación de colonias (similaridad PxM2 + amenidades + texto)
+    - Detección de listings caducados (comparar periodos consecutivos)
+LONG TERM:
+    - API REST para servir métricas
+    - Automatización orquestación (Airflow / Prefect)
+    - MLOps para predicción de tiempo en mercado
+
+FIN DEL DOCUMENTO

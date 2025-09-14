@@ -1,0 +1,7 @@
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap,__dup_key
+Sep25_7c58ec03,Inm24,Zap,La Estancia,Ven,Dep,107.0,3.0,4.0,4600000.0,,-103.431776,20.669992,64.0,2.0,36,42990.65420560748,01/04/2025,Zap|La Estancia|4600000.0|107.0|Dep
+Sep25_a585e927,Inm24,Zap,La Estancia,Ven,Dep,148.0,3.0,2.0,5900000.0,2000.0,-103.429692,20.66935,,2.5,5,39864.86486486487,01/04/2025,Zap|La Estancia|5900000.0|148.0|Dep
+Sep25_65eba4fa,Inm24,Zap,La Estancia,Ven,Dep,108.0,3.0,,5900000.0,2500.0,-103.429402,20.669029,,2.5,6,54629.62962962963,01/04/2025,Zap|La Estancia|5900000.0|108.0|Dep
+Sep25_ac610d7d,Inm24,Zap,La Estancia,Ven,Dep,120.0,2.0,1.0,4700000.0,,-103.429189,20.668982,356.0,1.5,0,39166.66666666666,01/04/2025,Zap|La Estancia|4700000.0|120.0|Dep
+Sep25_dd1db538,Inm24,Zap,La Estancia,Ven,Dep,113.0,2.0,1.0,5595747.0,,-103.429503,20.669471,,2.0,0,49519.88495575221,01/04/2025,Zap|La Estancia|5595747.0|113.0|Dep
+Sep25_f63b7be2,Inm24,Zap,La Estancia,Ven,Dep,64.0,1.0,1.0,3592640.0,,-103.429503,20.669471,,1.0,0,56135.0,01/04/2025,Zap|La Estancia|3592640.0|64.0|Dep

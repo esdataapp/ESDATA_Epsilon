@@ -1,0 +1,2 @@
+﻿Periodo,Ciudad,Operacion,Tipo,Colonia,n,precio_representativo,precio_min,precio_max,precio_skew,precio_metodo,area_m2_representativo,area_m2_min,area_m2_max,area_m2_skew,area_m2_metodo,PxM2_representativo,PxM2_min,PxM2_max,PxM2_skew,PxM2_metodo
+Sep25,Zap,Ven,Terreno / Lote,Puerta de Hierro,15,27890000.0,17990000.0,67000000.0,1.5110785712902872,mediana_IQR,550.0,344.0,1200.0,0.7726912695507191,mediana_IQR,49382.71604938272,37171.3508612874,70345.67901234567,0.5313864079285793,mediana_IQR

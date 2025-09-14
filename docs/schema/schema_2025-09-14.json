@@ -1,0 +1,106 @@
+{
+  "schema_version": "2025-09-14",
+  "proyecto": "ESDATA_Epsilon",
+  "descripcion": "Metadata estructurada de variables consolidadas para ingestión en Supabase y consumo analítico / LLM.",
+  "licencia": "Interno",
+  "generated_at": "2025-09-14T00:00:00Z",
+  "contacto": "data-eng@esdata.local",
+  "variables": [
+    {
+      "nombre": "id",
+      "tipo": "int",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "fuente_original": "scraper",
+      "descripcion": "Identificador único interno de la propiedad (post-dedupe).",
+      "categoria": "identificador",
+      "llave_primaria": true
+    },
+    {
+      "nombre": "precio",
+      "tipo": "numeric",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "descripcion": "Precio total listado en moneda local.",
+      "categoria": "financiero",
+      "dependencias": ["raw_precio"],
+      "sensibilidad": "media"
+    },
+    {
+      "nombre": "area_m2",
+      "tipo": "numeric",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "descripcion": "Área construida/útil en metros cuadrados.",
+      "categoria": "fisico"
+    },
+    {
+      "nombre": "pxm2",
+      "tipo": "numeric",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "descripcion": "Precio por metro cuadrado (precio/area_m2).",
+      "categoria": "financiero",
+      "dependencias": ["precio", "area_m2"],
+      "formula": "precio / area_m2"
+    },
+    {
+      "nombre": "estrato_area",
+      "tipo": "text",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "descripcion": "Bin categórico de área según cortes configurados.",
+      "categoria": "segmentacion",
+      "dominio_ejemplo": ["0-60","60-90","90-120",">120"]
+    },
+    {
+      "nombre": "flag_outlier_precio",
+      "tipo": "smallint",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "descripcion": "Indicador (0/1) si precio fue marcado outlier por reglas IQR/ZScore.",
+      "categoria": "calidad"
+    },
+    {
+      "nombre": "confidence_score_colonia",
+      "tipo": "numeric",
+      "tabla_destino": "resumen_colonia_final",
+      "nivel": "colonia",
+      "descripcion": "Score 0-1 de confiabilidad estadística de la colonia.",
+      "categoria": "score",
+      "dependencias": ["n_colonia","pxm2_iqr","skew_pxm2","ratio_outliers_pxm2"],
+      "formula": "w1*f(n)+w2*f(iqr_ratio)+w3*f(|skew|)+w4*(1-ratio_outliers)"
+    },
+    {
+      "nombre": "amen_alberca",
+      "tipo": "smallint",
+      "tabla_destino": "final_amenidades",
+      "nivel": "listing",
+      "descripcion": "1 si la propiedad declara alberca.",
+      "categoria": "amenidad"
+    },
+    {
+      "nombre": "lift_amen_alberca",
+      "tipo": "numeric",
+      "tabla_destino": "final_amenidades",
+      "nivel": "colonia",
+      "descripcion": "Mediana pxm2 con alberca / mediana pxm2 sin alberca (misma partición).",
+      "categoria": "amenidad",
+      "n_min_requerido": 5
+    },
+    {
+      "nombre": "geom",
+      "tipo": "geometry(Point,4326)",
+      "tabla_destino": "final_num",
+      "nivel": "listing",
+      "descripcion": "Punto geográfico lat/lon.",
+      "categoria": "geoespacial",
+      "dependencias": ["latitud","longitud"]
+    }
+  ],
+  "notas": [
+    "Este schema es parcial de ejemplo; ampliar con script generador automático posteriormente.",
+    "Mantener versionado: cualquier cambio estructural -> nueva fecha schema.",
+    "Campos amen_* siguen convención binaria 0/1."
+  ]
+}

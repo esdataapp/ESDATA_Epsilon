@@ -1,0 +1,6 @@
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap,__dup_key
+Sep25_cc8c2cb1,Inm24,Zap,Santillana,Ven,Dep,110.0,2.0,2.0,4100000.0,,-103.464834,20.718787,132.0,2.0,4,37272.72727272727,01/09/2025,Zap|Santillana|4100000.0|110.0|Dep
+Sep25_74dfe744,Inm24,Zap,Santillana,Ven,Dep,94.0,2.0,2.0,4750000.0,3000.0,-103.460643,20.719516,,2.0,0,50531.914893617024,01/04/2025,Zap|Santillana|4750000.0|94.0|Dep
+Sep25_288c6e60,Inm24,Zap,Santillana,Ven,Dep,104.0,2.0,2.0,4500000.0,,-103.462969,20.717702,27.0,1.5,4,43269.230769230766,01/04/2025,Zap|Santillana|4500000.0|104.0|Dep
+Sep25_faa00e58,Inm24,Zap,Santillana,Ven,Dep,229.0,3.0,2.0,6950000.0,3585.0,-103.460643,20.719516,10.0,3.0,0,30349.34497816594,01/04/2025,Zap|Santillana|6950000.0|229.0|Dep
+Sep25_01e6ab32,Inm24,Zap,Santillana,Ven,Dep,285.0,3.0,3.0,7500000.0,4773.0,-103.460825,20.71943,,3.5,2,26315.78947368421,01/04/2025,Zap|Santillana|7500000.0|285.0|Dep
