@@ -1,0 +1,159 @@
+Qué vas a hacer ahora
+1.	Crear los .env en los lugares correctos.
+2.	Ejecutar los comandos en la terminal integrada de VS Code (no en CMD aparte).
+3.	Conectar NestJS + Prisma y Python a Supabase.
+________________________________________
+1) Abre la terminal correcta
+1.	Abre Visual Studio Code.
+2.	Menú Terminal → New Terminal (se abre abajo).
+3.	Verifica en qué carpeta está parado: a la izquierda del prompt debe verse la ruta de tu proyecto.
+o	Si no, navega con: cd C:\ruta\de\tu\proyecto
+Siempre vas a correr los comandos en esta terminal de VS Code. Cuando te diga “ve a backend” o “ve a frontend”, es con cd.
+________________________________________
+2) Dónde crear los .env y qué poner adentro
+Voy a proponer esta estructura (ajústala a tu repo si cambia):
+tu-proyecto/
+  frontend/      # Vite + React + TS
+  backend/       # NestJS + Prisma
+  etl/           # scripts de Python para análisis/ingestas
+2.1 Backend (NestJS)
+•	Archivo: tu-proyecto/backend/.env
+•	Contenido (pega esto y reemplaza TODO lo de MAYÚSCULAS):
+# Prisma usa esta URL para conectarse (pooler recomendado con Prisma)
+PGPOOL_URL=postgresql://postgres:TU_PASSWORD@db.TU_HOST_SUPABASE:6543/postgres?sslmode=require
+
+# Si quieres la conexión directa (útil para cargas pesadas via scripts)
+PGURL=postgresql://postgres:TU_PASSWORD@TU_HOST_SUPABASE:5432/postgres?sslmode=require
+Dónde saco TU_HOST_SUPABASE y la pass?
+En el panel de Supabase → Project Settings → Database:
+•	Host (algo como aws-xyz.supabase.co)
+•	Password: la que definiste al crear el proyecto.
+Nota: El pooler de Supabase escucha en 6543 (va muy bien con Prisma). La conexión directa es 5432.
+2.2 Frontend (Vite)
+•	Archivo: tu-proyecto/frontend/.env.local
+•	Contenido (reemplaza con tus valores):
+VITE_SUPABASE_URL=https://TU_PROJECT_ID.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...   # Anon key (solo en frontend)
+Dónde saco esto?
+Supabase → Project Settings → API (copias Project URL y anon public).
+Importante: en Vite, las variables deben empezar con VITE_ o no estarán disponibles en el código.
+2.3 Python (ETL/análisis)
+•	Archivo: tu-proyecto/etl/.env
+•	Contenido:
+PGURL=postgresql://postgres:TU_PASSWORD@TU_HOST_SUPABASE:5432/postgres?sslmode=require
+2.4 Evita subir secretos a GitHub
+En tu-proyecto/.gitignore agrega (si no están):
+backend/.env
+frontend/.env.local
+etl/.env
+________________________________________
+3) NestJS + Prisma (pasos exactos)
+Todo esto en la terminal de VS Code.
+1.	Ve a la carpeta backend:
+cd backend
+2.	Instala Prisma y el cliente:
+npm i -D prisma
+npm i @prisma/client
+3.	Inicializa Prisma (crea prisma/ y un .env propio de Prisma). Ignóralo si ya pusiste backend/.env. Lo importante es que DATABASE_URL NO es obligatorio si usas PGPOOL_URL.
+Aun así, para evitar confusiones, edita prisma/schema.prisma así:
+datasource db {
+  provider = "postgresql"
+  url      = env("PGPOOL_URL") // usamos el pooler de 6543
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+4.	Si ya creaste las tablas en Supabase (con SQL), jala el esquema:
+npx prisma db pull
+npx prisma generate
+5.	Prueba conexión rápida con Prisma Studio:
+npx prisma studio
+Se abre en el navegador. Si carga sin error, ya “ve” tu DB.
+Si falla por URL, revisa backend/.env y que PGPOOL_URL esté bien (host, pass, sslmode=require).
+________________________________________
+4) Tu servicio Prisma en Nest (copia/pega)
+Crea backend/src/prisma.service.ts:
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  async onModuleInit() { await this.$connect(); }
+  async onModuleDestroy() { await this.$disconnect(); }
+}
+Regístralo en tu módulo principal (por ejemplo app.module.ts):
+import { Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],
+})
+export class AppModule {}
+Crea un endpoint de prueba (por ejemplo health.controller.ts):
+import { Controller, Get } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Controller('health')
+export class HealthController {
+  constructor(private prisma: PrismaService) {}
+
+  @Get()
+  async ok() {
+    const [{ now }] = await this.prisma.$queryRawUnsafe<any[]>("SELECT now();");
+    return { status: 'ok', now };
+  }
+}
+Levanta el backend:
+npm run start:dev
+Abre http://localhost:3000/health → deberías ver { status: "ok", now: ... }.
+________________________________________
+5) Frontend (Vite) con Supabase (si lo necesitas en el cliente)
+1.	Ve a la carpeta frontend:
+cd ../frontend
+2.	Instala el SDK:
+npm i @supabase/supabase-js
+3.	Crea el cliente (por ejemplo src/lib/supabaseClient.ts):
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL!,
+  import.meta.env.VITE_SUPABASE_ANON_KEY!
+);
+4.	Úsalo donde toque (o mejor, habla con tu backend Nest y deja el SDK solo para auth si lo usas).
+________________________________________
+6) Python: prueba de lectura y análisis
+1.	Ve a la carpeta de etl:
+cd ../etl
+2.	Instala dependencias:
+py -m pip install python-dotenv sqlalchemy psycopg2-binary pandas
+3.	Crea test_query.py:
+import os
+from dotenv import load_dotenv
+import pandas as pd
+from sqlalchemy import create_engine
+
+load_dotenv()  # lee etl/.env
+engine = create_engine(os.environ["PGURL"])
+
+df = pd.read_sql("SELECT 1 AS ok;", engine)
+print(df)
+4.	Ejecuta:
+py test_query.py
+Si imprime ok = 1, ya estás conectado.
+________________________________________
+Dónde correr cada cosa (resumen corto)
+•	Comandos de Node/Prisma/Nest → terminal de VS Code, dentro de backend/.
+•	Comandos de Vite/React → terminal de VS Code, dentro de frontend/.
+•	Scripts de Python → terminal de VS Code, dentro de etl/.
+•	Nada de esto va en “terminal de Windows” por separado a menos que quieras; la integrada de VS Code es suficiente.
+________________________________________
+Mini-FAQ para que no te trabes
+•	No me reconoce npx prisma → instala Node LTS desde nodejs.org, reabre VS Code.
+•	Error de SSL → tu URL debe terminar con ?sslmode=require.
+•	Prisma se desconecta → usa PGPOOL_URL (6543).
+•	No quiero que el front toque la DB → perfecto: que React hable con Nest, y Nest con Prisma.
+________________________________________
+Si tu repo no tiene frontend/, backend/, etl/, dime cómo se llaman tus carpetas y te ajusto exactamente las rutas de los .env y los cd.
+
