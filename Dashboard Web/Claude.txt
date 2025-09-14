@@ -108,21 +108,6 @@ Agregar mapas interactivos con las ubicaciones de propiedades
 ////////////////////////////////////////////////////////////////
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, ScatterChart, Scatter,

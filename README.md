@@ -139,7 +139,50 @@ Botones para descargar correlaciones por colonia y efectos de amenidades. Nomenc
 - Export GEOJSON por colonia / niveles (Niveles 2–4).
 
 ## Dependencias Principales
-Ver `requirements.txt`. Destacadas: `pandas`, `numpy`, `scikit-learn`, `scipy`, `statsmodels`, `streamlit`, `plotly`, `pydeck`, `geopandas`, `shapely`, `fiona`, `pyproj`, `wordcloud`, `nltk`, `textblob`.
+Ahora se segmentan por entorno para no sobre‑instalar:
+
+| Entorno | Archivo | Contenido principal |
+|---------|---------|---------------------|
+| Core (pipeline / estadística) | `requirements.txt` | pandas, numpy, scipy, scikit-learn, statsmodels, geopandas, text libs básicas |
+| Dashboard (UI) | `esdata/dashboard/requirements.txt` | streamlit, plotly, pydeck, wordcloud, bokeh, seaborn, matplotlib |
+| Supabase (ingesta) | `Supabase/requirements.txt` | psycopg2-binary, SQLAlchemy, requests, dotenv |
+
+Estrategias de instalación:
+
+1) Máquina sólo pipeline:
+```powershell
+pip install -r requirements.txt
+```
+2) Máquina pipeline + dashboard (mismo venv):
+```powershell
+pip install -r requirements.txt
+pip install -r esdata/dashboard/requirements.txt
+```
+3) Máquina sólo dashboard (entorno aislado):
+```powershell
+pip install -r esdata/dashboard/requirements.txt
+# (Añadir pandas/numpy si faltan)
+```
+4) Máquina sólo ingesta Supabase:
+```powershell
+pip install -r Supabase/requirements.txt
+```
+5) Todo en entornos separados (recomendado para limpieza):
+```
+python -m venv .venv_core
+.\.venv_core\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+python -m venv .venv_dashboard
+.\.venv_dashboard\Scripts\Activate.ps1
+pip install -r esdata/dashboard/requirements.txt
+
+python -m venv .venv_supabase
+.\.venv_supabase\Scripts\Activate.ps1
+pip install -r Supabase/requirements.txt
+```
+
+Nota: Si compartes venv y ya tenías instaladas libs pesadas del dashboard, la separación evita replicarlas en máquinas donde sólo se genera el pipeline o se hace ingesta.
 
 ## Buenas Prácticas Implementadas
 - Logging centralizado.

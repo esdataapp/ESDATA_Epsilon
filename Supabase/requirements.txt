@@ -1,0 +1,7 @@
+# Supabase / Ingesta requirements
+# Solo para máquinas que ejecutan scripts de carga (REST o psycopg2)
+
+requests>=2.31.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9
+SQLAlchemy>=2.0.0

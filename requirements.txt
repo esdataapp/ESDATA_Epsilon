@@ -1,58 +1,55 @@
-# ESDATA_Epsilon - Proyecto de Análisis Inmobiliario
-# Requerimientos de Python para el proyecto
+###############################################
+# ESDATA_Epsilon - Requirements CORE (ETL + Estadística)
+#
+# Este archivo SOLO contiene dependencias mínimas para:
+#  - Consolidación y limpieza de datos
+#  - Estadística básica y modelado simple
+#  - Geoprocesamiento necesario para asignar colonias
+#  - Procesamiento básico de texto (marketing)
+#
+# Otros entornos:
+#  Dashboard UI .......... esdata/dashboard/requirements.txt
+#  Supabase / Ingesta ..... Supabase/requirements.txt
+#
+# Objetivo: Máquinas que sólo corren el pipeline no
+# cargan librerías de visualización o DB extra.
+###############################################
 
-# === CORE DEPENDENCIES ===
+# === CORE NUMPY / DATA ===
 pandas>=2.1.0
 numpy>=1.24.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
-plotly>=5.15.0
-
-# === GEOSPATIAL PROCESSING ===
-geopandas>=0.14.0
-shapely>=2.0.0
-fiona>=1.8.22
-pyproj>=3.4.0
-folium>=0.14.0
-
-# === TEXT PROCESSING ===
-nltk>=3.8
-textblob>=0.17.1
-regex>=2023.6.3
-
-# === STATISTICAL ANALYSIS ===
 scipy>=1.11.0
 scikit-learn>=1.3.0
 statsmodels>=0.14.0
 
-# === DATA VISUALIZATION ===
-bokeh>=3.2.0
-streamlit>=1.37.0
-wordcloud>=1.9.3
-pydeck>=0.9.1
+# === GEOSPATIAL (mínimo funcional) ===
+geopandas>=0.14.0
+shapely>=2.0.0
+fiona>=1.8.22
+pyproj>=3.4.0
 
-# === FILE HANDLING ===
+# === TEXT BASICS ===
+nltk>=3.8
+textblob>=0.17.1
+regex>=2023.6.3
+
+# === DATA I/O ===
 openpyxl>=3.1.0
 xlsxwriter>=3.1.0
 
-# === UTILITIES ===
+# === UTILIDADES ===
 tqdm>=4.65.0
 python-dotenv>=1.0.0
 colorama>=0.4.6
 
-# === DEVELOPMENT ===
-jupyter>=1.0.0
-ipykernel>=6.25.0
+# === OPCIONALES (descomentar según necesidad) ===
+# jupyter>=1.0.0
+# ipykernel>=6.25.0
+# matplotlib>=3.7.0
+# seaborn>=0.12.0
 
-# === OPTIONAL - WEB SCRAPING (si se necesita) ===
-requests>=2.31.0  # Necesario para ingesta REST a Supabase cuando no hay conexión directa IPv4
-# beautifulsoup4>=4.12.0
-# selenium>=4.11.0
+# === NOTA ===
+# plotly, streamlit, wordcloud, pydeck -> dashboard
+# requests, psycopg2-binary, SQLAlchemy -> supabase
 
-# === OPTIONAL - DATABASE (si se necesita) ===
-# sqlalchemy>=2.0.0
-# pymongo>=4.5.0
-
-# === DATABASE POSTGRES / SUPABASE (activado) ===
-psycopg2-binary>=2.9.9
-SQLAlchemy>=2.0.0
+# FIN CORE
