@@ -6,8 +6,8 @@ Herramientas para consultar, analizar y recuperar propiedades eliminadas
 import pandas as pd
 import numpy as np
 from Sistema_Papelera_Reciclaje import PapeleraReciclaje
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt  # Movido a requirements opcionales
+# import seaborn as sns  # Movido a requirements opcionales
 
 class UtilPapelera:
     """

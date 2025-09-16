@@ -118,16 +118,19 @@ def _logic_filter(df: pd.DataFrame, sensibilidad: str):
                 if precio < thr['precio_min_casa'] or precio > thr['precio_max_casa']: row_motivos.append('precio_fuera_rango_casa')
                 if rec > thr['rec_max_casa']: row_motivos.append('recamaras_excesivas_casa')
 
-            # ratios
-            if pd.notna(banos) and pd.notna(rec) and rec>0:
-                ratio_b = banos/rec
-                if ratio_b>thr['banos_ratio_max']: row_motivos.append('ratio_banos_rec_excesivo')
-            if pd.notna(estac) and pd.notna(rec) and rec>0 and estac>0:
-                ratio_e = estac/rec
-                if ratio_e>thr['estac_ratio_max']: row_motivos.append('ratio_estac_rec_excesivo')
-            if pd.notna(area) and pd.notna(rec) and rec>0:
-                area_por_rec = area/rec
-                if area_por_rec < thr['area_min_por_rec']: row_motivos.append('area_por_rec_baja')
+            # ratios (con validación de división por cero)
+            if pd.notna(banos) and pd.notna(rec) and rec > 0:
+                ratio_b = banos / rec
+                if ratio_b > thr['banos_ratio_max']: 
+                    row_motivos.append('ratio_banos_rec_excesivo')
+            if pd.notna(estac) and pd.notna(rec) and rec > 0 and estac > 0:
+                ratio_e = estac / rec
+                if ratio_e > thr['estac_ratio_max']: 
+                    row_motivos.append('ratio_estac_rec_excesivo')
+            if pd.notna(area) and pd.notna(rec) and rec > 0 and area > 0:
+                area_por_rec = area / rec
+                if area_por_rec < thr['area_min_por_rec']: 
+                    row_motivos.append('area_por_rec_baja')
 
             if pd.notna(pxm2) and pxm2>thr['pxm2_max']:
                 row_motivos.append('PxM2_excesivo')

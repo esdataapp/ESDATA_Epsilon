@@ -1,3 +1,0 @@
-﻿Periodo,Ciudad,Operacion,Tipo,Colonia,n,precio_representativo,precio_min,precio_max,precio_skew,precio_metodo,area_m2_representativo,area_m2_min,area_m2_max,area_m2_skew,area_m2_metodo,PxM2_representativo,PxM2_min,PxM2_max,PxM2_skew,PxM2_metodo
-Sep25,Zap,Ven,Ofc,Las Arboledas,5,2801400.0,2673000.0,3608100.0,1.9499785215927532,mediana_rango,41.0,38.0,55.0,1.9899639030216814,mediana_rango,70342.1052631579,65601.81818181818,70705.26315789473,-1.380056332145498,mediana_rango
-Sep25,Zap,Ven,Ofc,Puerta de Hierro,6,14787910.0,4212866.0,29000000.0,0.09553259965612731,mediana_rango,188.5,44.0,362.0,0.039835994845327884,mediana_rango,87510.74652777778,65000.0,97513.2258064516,-0.740547213037059,mediana_rango

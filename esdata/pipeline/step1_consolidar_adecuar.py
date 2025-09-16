@@ -24,6 +24,14 @@ VAR_FILE_ORDER = [
     'recamaras_icon','medio_banos_icon','antiguedad_icon','Caracteristicas_generales','Servicios','Amenidades','Exteriores'
 ]
 
+# Mapeo de nombres de columnas para normalizar inconsistencias
+COLUMN_NAME_MAPPING = {
+    'Características generales': 'Caracteristicas_generales',
+    'características generales': 'Caracteristicas_generales',
+    'CARACTERÍSTICAS GENERALES': 'Caracteristicas_generales',
+    'caracteristicas generales': 'Caracteristicas_generales'
+}
+
 RE_COORD = re.compile(r'center=([+-]?\d+\.?\d*),([+-]?\d+\.?\d*)')
 
 ABREV_TIPO = {'Departamento':'Dep','DEPARTAMENTO':'Dep','Dep':'Dep','Casa':'Cas','CASA':'Cas','Oficina':'Ofc','Ofic':'Ofc'}
@@ -97,7 +105,14 @@ def _norm_simple(val, mapa):
 
 def _build_id(row):
     period = _PERIODO_OVERRIDE or PERIODO_ACTUAL
-    seed = f"{period}|{row.get('Ciudad') or ''}|{row.get('operacion') or ''}|{row.get('tipo_propiedad') or ''}|{row.get('titulo') or ''}|{row.get('precio') or ''}".lower()
+    # Manejo seguro de valores nulos para evitar IDs inconsistentes
+    ciudad = str(row.get('Ciudad') or 'Unknown').strip()
+    operacion = str(row.get('operacion') or 'Unknown').strip()
+    tipo = str(row.get('tipo_propiedad') or 'Unknown').strip()
+    titulo = str(row.get('titulo') or 'Unknown').strip()
+    precio = str(row.get('precio') or 'Unknown').strip()
+    
+    seed = f"{period}|{ciudad}|{operacion}|{tipo}|{titulo}|{precio}".lower()
     h = hashlib.sha1(seed.encode()).hexdigest()[:8]
     return f"{period}_{h}"
 

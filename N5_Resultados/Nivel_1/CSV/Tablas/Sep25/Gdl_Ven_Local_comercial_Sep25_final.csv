@@ -1,2 +1,0 @@
-﻿Periodo,Ciudad,Operacion,Tipo,Colonia,n,precio_representativo,precio_min,precio_max,precio_skew,precio_metodo,area_m2_representativo,area_m2_min,area_m2_max,area_m2_skew,area_m2_metodo,PxM2_representativo,PxM2_min,PxM2_max,PxM2_skew,PxM2_metodo
-Sep25,Gdl,Ven,Local comercial,Americana,5,25000000.0,1390000.0,47000000.0,0.14043265573339095,mediana_rango,558.0,33.0,1552.0,1.2904658383443435,mediana_rango,42121.21212121212,26452.905811623248,54569.89247311828,0.1072686115556696,mediana_rango

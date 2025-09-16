@@ -1,6 +1,0 @@
-﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap,__dup_key
-Sep25_56eef2ba,Inm24,Zap,San Francisco,Ven,Cas,100.0,3.0,1.0,3260000.0,600.0,-103.391776,20.75053,259.0,2.0,15,32600.0,01/09/2025,Zap|San Francisco|3260000.0|100.0|Cas
-Sep25_a73e03de,Inm24,Zap,San Francisco,Ven,Cas,480.0,6.0,6.0,62908880.0,,-103.40142,20.722572,12.0,5.5,0,131060.16666666669,01/09/2025,Zap|San Francisco|62908880.0|480.0|Cas
-Sep25_f27ffd64,Inm24,Zap,San Francisco,Ven,Cas,420.0,6.0,6.0,62853072.0,,-103.40202,20.72344,12.0,5.5,0,149650.17142857143,01/09/2025,Zap|San Francisco|62853072.0|420.0|Cas
-Sep25_26552fb4,Inm24,Zap,San Francisco,Ven,Cas,100.0,3.0,2.0,3180000.0,,-103.393993,20.750737,45.0,3.0,,31800.0,01/09/2025,Zap|San Francisco|3180000.0|100.0|Cas
-Sep25_7dc5dadb,Inm24,Zap,San Francisco,Ven,Cas,160.0,4.0,2.0,6250000.0,,-103.39206,20.751125,81.0,3.0,15,39062.5,01/09/2025,Zap|San Francisco|6250000.0|160.0|Cas
