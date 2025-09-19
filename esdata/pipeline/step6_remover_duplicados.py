@@ -102,31 +102,72 @@ def _ensure_columns(df: pd.DataFrame, required: list[str]):
     return df
 
 def run(periodo):
+    log.info('=' * 80)
+    log.info('🗑️ INICIANDO STEP 6: REMOCIÓN DE DUPLICADOS')
+    log.info('=' * 80)
+    log.info(f'📅 Periodo: {periodo}')
+    
     base_dir = os.path.join(path_consolidados(), periodo)
     num_in = os.path.join(base_dir, f'5.Num_Corroborado_{periodo}.csv')
     tex_a = os.path.join(base_dir, f'4a.Tex_Titulo_Descripcion_{periodo}.csv')
     tex_b = os.path.join(base_dir, f'4b.Tex_Car_Ame_Ser_Ext_{periodo}.csv')
+    
+    log.info('📁 Verificando archivos de entrada...')
     for p in [num_in, tex_a, tex_b]:
         if not os.path.exists(p):
             raise FileNotFoundError(p)
+        log.info(f'   ✅ {os.path.basename(p)}')
+    
+    log.info('📥 Cargando datos...')
     num_df = read_csv(num_in)
     a_df = read_csv(tex_a)
     b_df = read_csv(tex_b)
+    
+    initial_num_count = len(num_df)
+    log.info(f'✅ Datos cargados:')
+    log.info(f'   • Datos numéricos: {initial_num_count:,} propiedades')
+    log.info(f'   • Datos MKT: {len(a_df):,} registros')
+    log.info(f'   • Datos AME: {len(b_df):,} registros')
+    
+    # Detectar duplicados con jerarquía
+    log.info('🔍 Detectando duplicados con criterios jerárquicos...')
+    log.info('   📋 Jerarquía: Área → Ciudad → Colonia → Precio → Longitud → Latitud → Recámaras/Baños')
+    
     dedup_num, dupes = _detect_duplicates(num_df)
+    duplicados_encontrados = len(dupes)
+    tasa_duplicados = (duplicados_encontrados / initial_num_count * 100) if initial_num_count > 0 else 0
+    
+    log.info('📊 RESULTADO DE DETECCIÓN:')
+    log.info(f'   • Propiedades únicas: {len(dedup_num):,}')
+    log.info(f'   • Duplicados encontrados: {duplicados_encontrados:,}')
+    log.info(f'   • Tasa de duplicación: {tasa_duplicados:.1f}%')
+    
     # Guardar duplicados
-    if len(dupes)>0:
+    if len(dupes) > 0:
         dup_dir = ensure_dir(path_base('Datos_Filtrados','Duplicados', periodo))
-        write_csv(dupes, os.path.join(dup_dir, f'duplicados_{periodo}.csv'))
-    # Filtrar marketing/amenidades segun ids finales
+        dup_path = os.path.join(dup_dir, f'duplicados_{periodo}.csv')
+        write_csv(dupes, dup_path)
+        log.info(f'💾 Duplicados guardados en: {dup_path}')
+        
+        # Estadísticas de duplicados
+        if not dupes.empty:
+            log.info('🔍 ANÁLISIS DE DUPLICADOS:')
+            tipo_dups = dupes['tipo_propiedad'].value_counts()
+            for tipo, count in tipo_dups.head(5).items():
+                log.info(f'   • {tipo}: {count:,} duplicados')
+    
+    # Procesar archivos de texto
+    log.info('🔗 Sincronizando archivos de texto con IDs únicos...')
     ids_final = set(dedup_num['id'])
-    log.info(f'IDs únicos después de eliminar duplicados: {len(ids_final)}')
     
     # Verificar que los archivos de texto tengan los mismos IDs
     a_ids = set(a_df['id']) if 'id' in a_df.columns else set()
     b_ids = set(b_df['id']) if 'id' in b_df.columns else set()
     
-    log.info(f'IDs en archivo MKT original: {len(a_ids)}')
-    log.info(f'IDs en archivo AME original: {len(b_ids)}')
+    log.info('📊 VERIFICACIÓN DE IDs:')
+    log.info(f'   • IDs únicos (NUM): {len(ids_final):,}')
+    log.info(f'   • IDs originales (MKT): {len(a_ids):,}')
+    log.info(f'   • IDs originales (AME): {len(b_ids):,}')
     
     # Filtrar usando solo los IDs que quedaron después de eliminar duplicados
     # CREAR DataFrames con TODOS los IDs de dedup_num, incluso si faltan en archivos de texto
@@ -184,11 +225,13 @@ def run(periodo):
         log.warning(f'⚠️ Corrección de emergencia aplicada: NUM={len(dedup_num)}, MKT={len(a_final)}, AME={len(b_final)}')
     else:
         log.info(f'✅ CONSISTENCIA PERFECTA: todos los archivos tienen exactamente {len(final_num_ids)} registros')
-    # Reinyectar columnas faltantes 'operacion','mantenimiento','tipo_propiedad' si se perdieron en a_final o b_final desde num_df
+    # Reinyectar columnas críticas
+    log.info('🔄 Reinyectando columnas críticas en archivos de texto...')
+    
     # Normalizar variantes de nombres antes de construir lookup
     variant_map = {
         'tiempo_publicacion dias': 'tiempo_publicacion',
-        'antiguedad_años': 'antiguedad_icon',  # suponiendo que esta es la semántica usada posteriormente
+        'antiguedad_años': 'antiguedad_icon',
         'Banos_totales': 'Banos_totales',
     }
     for old, new in variant_map.items():
@@ -198,39 +241,89 @@ def run(periodo):
                 dedup_num.rename(columns={old: new}, inplace=True)
 
     reinject_cols = ['operacion','mantenimiento','tipo_propiedad']
-    # Usar dedup_num (ya libre de duplicados) como base de mapeo para evitar índice no único
     base_lookup = dedup_num.set_index('id')
     if not base_lookup.index.is_unique:
-        # En caso extremo, mantener la primera aparición
         base_lookup = base_lookup[~base_lookup.index.duplicated(keep='first')]
+    
+    reinjected_count = 0
     for col in reinject_cols:
         if col not in a_final.columns:
             a_final[col] = a_final['id'].map(base_lookup[col]) if col in base_lookup.columns else None
+            reinjected_count += 1
         if col not in b_final.columns:
             b_final[col] = b_final['id'].map(base_lookup[col]) if col in base_lookup.columns else None
-    # Asegurar orden mínimo para marketing y amenidades (mantener demás columnas originales)
+            reinjected_count += 1
+    
+    if reinjected_count > 0:
+        log.info(f'✅ Columnas reinyectadas: {reinjected_count}')
+    
+    # Asegurar columnas mínimas
     a_final = _ensure_columns(a_final, ['id','PaginaWeb','Ciudad','Colonia','operacion','tipo_propiedad','area_m2','precio','mantenimiento'])
     b_final = _ensure_columns(b_final, ['id','Ciudad','Colonia','operacion','tipo_propiedad','area_m2','precio','mantenimiento'])
-    # Agregar PxM2
+    
+    # Calcular PxM2 para todos los archivos
+    log.info('🧮 Calculando PxM2 para archivos finales...')
+    pxm2_calculados = 0
+    
     if 'precio' in dedup_num.columns and 'area_m2' in dedup_num.columns:
         mask = dedup_num['area_m2'].notna() & (dedup_num['area_m2']>0) & dedup_num['precio'].notna()
         dedup_num['PxM2'] = None
-        dedup_num.loc[mask,'PxM2']= dedup_num.loc[mask,'precio']/dedup_num.loc[mask,'area_m2']
-    for df, name in [(a_final,'MKT'),(b_final,'Ame')]:
+        dedup_num.loc[mask,'PxM2'] = dedup_num.loc[mask,'precio']/dedup_num.loc[mask,'area_m2']
+        pxm2_calculados += mask.sum()
+    
+    for df, name in [(a_final,'MKT'),(b_final,'AME')]:
         if 'precio' in df.columns and 'area_m2' in df.columns:
             mask2 = df['area_m2'].notna() & (df['area_m2']>0) & df['precio'].notna()
-            df['PxM2']=None
-            df.loc[mask2,'PxM2']= df.loc[mask2,'precio']/df.loc[mask2,'area_m2']
-    # Salidas
+            df['PxM2'] = None
+            df.loc[mask2,'PxM2'] = df.loc[mask2,'precio']/df.loc[mask2,'area_m2']
+    
+    log.info(f'✅ PxM2 calculado para {pxm2_calculados:,} propiedades')
+    
+    # Generar archivos finales
+    log.info('💾 Generando archivos finales...')
     out_dir = ensure_dir(path_results_level(1))
-    # Orden preferencial para archivo numérico
+    
+    # Ordenar columnas para archivo numérico
     dedup_num = _ensure_columns(dedup_num, ESSENTIAL_NUM_COLS)
     num_cols_order = [c for c in ESSENTIAL_NUM_COLS if c in dedup_num.columns] + [c for c in dedup_num.columns if c not in ESSENTIAL_NUM_COLS]
     dedup_num = dedup_num[num_cols_order]
-    write_csv(dedup_num, os.path.join(out_dir, f'0.Final_Num_{periodo}.csv'))
-    write_csv(a_final, os.path.join(out_dir, f'0.Final_MKT_{periodo}.csv'))
-    write_csv(b_final, os.path.join(out_dir, f'0.Final_Ame_{periodo}.csv'))
-    log.info(f'Registros finales: {len(dedup_num)} duplicados: {len(dupes)}')
+    
+    # Guardar archivos
+    paths = {}
+    paths['NUM'] = os.path.join(out_dir, f'0.Final_Num_{periodo}.csv')
+    paths['MKT'] = os.path.join(out_dir, f'0.Final_MKT_{periodo}.csv')
+    paths['AME'] = os.path.join(out_dir, f'0.Final_Ame_{periodo}.csv')
+    
+    write_csv(dedup_num, paths['NUM'])
+    write_csv(a_final, paths['MKT'])
+    write_csv(b_final, paths['AME'])
+    
+    log.info('📊 ARCHIVOS FINALES GENERADOS:')
+    for name, path in paths.items():
+        size_mb = os.path.getsize(path) / 1024 / 1024
+        log.info(f'   • {name}: {path}')
+        log.info(f'     - Registros: {len(dedup_num) if name=="NUM" else len(a_final) if name=="MKT" else len(b_final):,}')
+        log.info(f'     - Tamaño: {size_mb:.2f} MB')
+    
+    # Verificación final de consistencia
+    log.info('🔍 VERIFICACIÓN FINAL DE CONSISTENCIA:')
+    log.info(f'   • Final_Num: {len(dedup_num):,} registros')
+    log.info(f'   • Final_MKT: {len(a_final):,} registros')
+    log.info(f'   • Final_AME: {len(b_final):,} registros')
+    
+    if len(dedup_num) == len(a_final) == len(b_final):
+        log.info('✅ CONSISTENCIA PERFECTA: Todos los archivos tienen el mismo número de registros')
+    else:
+        log.warning('⚠️ INCONSISTENCIA: Los archivos tienen diferentes números de registros')
+    
+    log.info(f'📈 RESUMEN FINAL:')
+    log.info(f'   • Propiedades procesadas: {initial_num_count:,}')
+    log.info(f'   • Duplicados eliminados: {duplicados_encontrados:,}')
+    log.info(f'   • Propiedades finales: {len(dedup_num):,}')
+    log.info(f'   • Tasa de retención: {(len(dedup_num)/initial_num_count*100):.1f}%')
+    
+    log.info('✅ STEP 6 COMPLETADO EXITOSAMENTE')
+    log.info('=' * 80)
 
 if __name__=='__main__':
     from datetime import datetime

@@ -118,58 +118,114 @@ def geocodificar(df: pd.DataFrame, colonias_gdf: gpd.GeoDataFrame):
     return df, coord_desconocido_mask
 
 def run(periodo):
+    log.info('=' * 80)
+    log.info('🌍 INICIANDO STEP 2: PROCESAMIENTO GEOESPACIAL')
+    log.info('=' * 80)
+    log.info(f'📅 Periodo: {periodo}')
+    
     input_path = os.path.join(path_consolidados(), periodo, f'1.Consolidado_Adecuado_{periodo}.csv')
     if not os.path.exists(input_path):
         raise FileNotFoundError(input_path)
+    
+    log.info(f'📁 Cargando datos de: {input_path}')
     df = read_csv(input_path)
+    initial_count = len(df)
+    log.info(f'✅ Propiedades cargadas: {initial_count:,}')
+    
+    # Estadísticas iniciales
+    coords_validas = (df['longitud'].notna() & df['latitud'].notna()).sum()
+    log.info(f'📍 Propiedades con coordenadas iniciales: {coords_validas:,}')
+    
+    log.info('🗺️ Cargando datos de colonias...')
     colonias = cargar_colonias()
+    log.info(f'✅ Colonias cargadas: {len(colonias):,} polígonos')
     
     # Procesar geocodificación
+    log.info('🔄 Iniciando proceso de geocodificación...')
     df2, coord_desconocido_mask = geocodificar(df, colonias)
     
-    # Identificar propiedades problemáticas (mejorado)
+    # Estadísticas de geocodificación
+    colonias_asignadas = df2['Colonia'].notna().sum()
+    ciudades_asignadas = df2['Ciudad'].notna().sum()
+    
+    log.info('📈 RESULTADOS DE GEOCODIFICACIÓN:')
+    log.info(f'   • Colonias asignadas: {colonias_asignadas:,}')
+    log.info(f'   • Ciudades asignadas: {ciudades_asignadas:,}')
+    
+    # Identificar propiedades problemáticas (LÓGICA COHERENTE)
+    # Si no tiene colonia válida, automáticamente no tiene ciudad válida
     sin_colonia_mask = (
         df2['Colonia'].isna() | 
         (df2['Colonia'].astype(str).str.strip() == '') |
         (df2['Colonia'].astype(str).str.lower() == 'desconocido')
     )
-    sin_colonia = sin_colonia_mask.sum()
     
+    # CORRECCIÓN LÓGICA: Si no hay colonia, no puede haber ciudad válida
+    # Marcar ciudad como "Desconocido" cuando no hay colonia válida
+    df2.loc[sin_colonia_mask, 'Ciudad'] = 'Desconocido'
+    
+    # Ahora las máscaras deben ser idénticas por lógica
     sin_ciudad_mask = (
         df2['Ciudad'].isna() | 
         (df2['Ciudad'].astype(str).str.strip() == '') |
         (df2['Ciudad'].astype(str).str.lower() == 'desconocido')
     )
-    sin_ciudad = sin_ciudad_mask.sum()
     
+    sin_colonia = sin_colonia_mask.sum()
+    sin_ciudad = sin_ciudad_mask.sum()
     coord_desconocido = coord_desconocido_mask.sum()
     
-    log.info(f'Propiedades sin colonia válida: {sin_colonia}')
-    log.info(f'Propiedades sin ciudad válida: {sin_ciudad}')
-    log.info(f'Propiedades con coordenadas Desconocido: {coord_desconocido}')
+    # Verificar coherencia lógica
+    if sin_colonia != sin_ciudad:
+        log.warning(f'⚠️ INCONSISTENCIA DETECTADA: sin_colonia ({sin_colonia}) ≠ sin_ciudad ({sin_ciudad})')
+        log.warning('Forzando coherencia lógica: sin colonia → sin ciudad')
+        
+        # Forzar coherencia: todas las propiedades sin colonia no tienen ciudad
+        df2.loc[sin_colonia_mask, 'Ciudad'] = 'Desconocido'
+        sin_ciudad_mask = sin_colonia_mask.copy()  # Hacer máscaras idénticas
+        sin_ciudad = sin_colonia
+    
+    log.info('⚠️ PROPIEDADES PROBLEMÁTICAS IDENTIFICADAS:')
+    log.info(f'   • Sin colonia válida: {sin_colonia:,}')
+    log.info(f'   • Sin ciudad válida: {sin_ciudad:,}') 
+    log.info(f'   • Con coordenadas "Desconocido": {coord_desconocido:,}')
+    log.info(f'   ✅ Coherencia lógica: {"SÍ" if sin_colonia == sin_ciudad else "NO"}')
     
     # Crear directorio para eliminados
     elim_dir = ensure_dir(path_base('Datos_Filtrados','Eliminados', periodo))
+    log.info(f'📁 Directorio de eliminados: {elim_dir}')
     
-    # Guardar propiedades sin colonia válida (incluyendo "Desconocido")
+    # Guardar propiedades problemáticas
+    archivos_eliminados = []
+    
+    # Como ahora sin_colonia == sin_ciudad por coherencia lógica,
+    # guardamos un solo archivo unificado
     if sin_colonia > 0:
-        df_sin_colonia = df2[sin_colonia_mask].copy()
-        write_csv(df_sin_colonia, os.path.join(elim_dir, f'sin_colonia_{periodo}.csv'))
-        log.info(f'Guardadas {sin_colonia} propiedades sin colonia válida en: sin_colonia_{periodo}.csv')
+        df_problematicas = df2[sin_colonia_mask].copy()
+        archivo_problematicas = os.path.join(elim_dir, f'sin_colonia_ciudad_{periodo}.csv')
+        write_csv(df_problematicas, archivo_problematicas)
+        archivos_eliminados.append(f'sin_colonia_ciudad_{periodo}.csv')
+        log.info(f'💾 Guardadas {sin_colonia:,} propiedades sin colonia/ciudad válida')
+        
+        # Mantener compatibilidad con archivos existentes (opcional)
+        if sin_colonia != sin_ciudad:  # Solo si hubo diferencia original
+            archivo_colonia = os.path.join(elim_dir, f'sin_colonia_{periodo}.csv')
+            archivo_ciudad = os.path.join(elim_dir, f'sin_ciudad_{periodo}.csv')
+            write_csv(df_problematicas, archivo_colonia)
+            write_csv(df_problematicas, archivo_ciudad)
+            archivos_eliminados.extend([f'sin_colonia_{periodo}.csv', f'sin_ciudad_{periodo}.csv'])
+            log.info(f'💾 Archivos separados generados para compatibilidad')
     
-    # Guardar propiedades sin ciudad válida (incluyendo "Desconocido")
-    if sin_ciudad > 0:
-        df_sin_ciudad = df2[sin_ciudad_mask].copy()
-        write_csv(df_sin_ciudad, os.path.join(elim_dir, f'sin_ciudad_{periodo}.csv'))
-        log.info(f'Guardadas {sin_ciudad} propiedades sin ciudad válida en: sin_ciudad_{periodo}.csv')
-    
-    # Guardar propiedades con coordenadas Desconocido
     if coord_desconocido > 0:
         df_coord_desconocido = df2[coord_desconocido_mask].copy()
-        write_csv(df_coord_desconocido, os.path.join(elim_dir, f'coordenadas_desconocido_{periodo}.csv'))
-        log.info(f'Guardadas {coord_desconocido} propiedades con coordenadas Desconocido en: coordenadas_desconocido_{periodo}.csv')
+        archivo_coords = os.path.join(elim_dir, f'coordenadas_desconocido_{periodo}.csv')
+        write_csv(df_coord_desconocido, archivo_coords)
+        archivos_eliminados.append(f'coordenadas_desconocido_{periodo}.csv')
+        log.info(f'💾 Guardadas {coord_desconocido:,} propiedades con coordenadas Desconocido')
     
     # FILTRAR: Eliminar propiedades sin colonia válida y con coordenadas desconocidas
+    log.info('🔍 Aplicando filtros de calidad...')
+    
     # Definir máscara para colonias válidas (no NaN, no 'Desconocido', no vacío)
     colonia_valida_mask = (
         df2['Colonia'].notna() & 
@@ -188,20 +244,48 @@ def run(periodo):
     df_final = df2[~coord_desconocido_mask & colonia_valida_mask & ciudad_valida_mask].copy()
     
     propiedades_eliminadas = len(df2) - len(df_final)
-    log.info(f'Propiedades eliminadas del archivo final: {propiedades_eliminadas}')
-    log.info(f'  - Con coordenadas Desconocido: {coord_desconocido_mask.sum()}')
-    log.info(f'  - Sin colonia válida: {(~colonia_valida_mask).sum()}')
-    log.info(f'  - Sin ciudad válida: {(~ciudad_valida_mask).sum()}')
-    log.info(f'Propiedades que pasan al archivo final: {len(df_final)}')
+    
+    log.info('📊 RESUMEN DE FILTRADO:')
+    log.info(f'   • Propiedades eliminadas total: {propiedades_eliminadas:,}')
+    log.info(f'   • Por coordenadas Desconocido: {coord_desconocido_mask.sum():,}')
+    log.info(f'   • Por colonia inválida: {(~colonia_valida_mask).sum():,}')
+    log.info(f'   • Por ciudad inválida: {(~ciudad_valida_mask).sum():,}')
+    log.info(f'   • Propiedades que pasan: {len(df_final):,}')
+    log.info(f'   • Tasa de retención: {(len(df_final)/initial_count*100):.1f}%')
+    
+    if archivos_eliminados:
+        log.info(f'📁 Archivos de propiedades eliminadas: {archivos_eliminados}')
     
     # Completar ID con Ciudad y Colonia para las propiedades válidas
+    log.info('🔗 Completando IDs con información de ubicación...')
     df_final = completar_id_con_ubicacion(df_final)
-    log.info('IDs completados con información de ubicación (Ciudad-Colonia)')
+    
+    # Estadísticas de IDs completados
+    ids_completados = df_final['id'].str.contains('-', na=False).sum()
+    log.info(f'✅ IDs completados con ubicación: {ids_completados:,}')
     
     # Guardar resultado principal (solo propiedades con colonia válida)
     out_dir = ensure_dir(os.path.join(path_consolidados(), periodo))
     out_path = os.path.join(out_dir, f'2.Consolidado_ConColonia_{periodo}.csv')
     write_csv(df_final, out_path)
+    
+    log.info('💾 ARCHIVO FINAL GENERADO:')
+    log.info(f'   • Ruta: {out_path}')
+    log.info(f'   • Tamaño: {os.path.getsize(out_path) / 1024 / 1024:.2f} MB')
+    log.info(f'   • Propiedades válidas: {len(df_final):,}')
+    
+    # Resumen por ciudad y tipo
+    if not df_final.empty:
+        log.info('🏙️ DISTRIBUCIÓN FINAL POR CIUDAD:')
+        for ciudad, count in df_final['Ciudad'].value_counts().head(10).items():
+            log.info(f'   • {ciudad}: {count:,} propiedades')
+        
+        log.info('🏠 DISTRIBUCIÓN POR TIPO DE PROPIEDAD:')
+        for tipo, count in df_final['tipo_propiedad'].value_counts().items():
+            log.info(f'   • {tipo}: {count:,} propiedades')
+    
+    log.info('✅ STEP 2 COMPLETADO EXITOSAMENTE')
+    log.info('=' * 80)
     
     return out_path
 

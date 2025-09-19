@@ -183,7 +183,7 @@ def _get_property_conditions(tipo_propiedad, operacion):
         return PROPERTY_CONDITIONS[key]
     else:
         # Si no hay condiciones específicas, usar valores por defecto MÁS ESTRICTOS
-        print(f"⚠️ NO SE ENCONTRARON CONDICIONES PARA: {key}")
+        # (Se reportará en el resumen final, no por cada caso individual)
         return {
             'area_min': 30, 'area_max': 500,
             'precio_min': 100000, 'precio_max': 20000000,
@@ -267,6 +267,11 @@ def _logic_filter(df: pd.DataFrame):
     return valid, invalid
 
 def run(periodo):
+    log.info('=' * 80)
+    log.info('🔍 INICIANDO STEP 5: ANÁLISIS LÓGICO Y CORROBORACIÓN')
+    log.info('=' * 80)
+    log.info(f'📅 Periodo: {periodo}')
+    
     base_dir = os.path.join(path_consolidados(), periodo)
     num_path = os.path.join(base_dir, f'3a.Consolidado_Num_{periodo}.csv')
     tex_num_path = os.path.join(base_dir, f'4a.Tex_Titulo_Descripcion_{periodo}.csv')
@@ -274,25 +279,97 @@ def run(periodo):
     if not os.path.exists(num_path) or not os.path.exists(tex_num_path):
         raise FileNotFoundError('Faltan entradas para paso 5')
     
+    log.info('📁 Cargando archivos de entrada...')
+    log.info(f'   • Datos numéricos: {num_path}')
+    log.info(f'   • Datos de texto: {tex_num_path}')
+    
     num_df = read_csv(num_path)
     tex_df = read_csv(tex_num_path)
+    
+    log.info(f'✅ Datos cargados:')
+    log.info(f'   • Registros numéricos: {len(num_df):,}')
+    log.info(f'   • Registros de texto: {len(tex_df):,}')
+    
+    log.info('🔗 Combinando datos numéricos y de texto...')
     merged = _merge(num_df, tex_df)
+    log.info(f'✅ Registros después de merge: {len(merged):,}')
+    
+    log.info('📈 Mejorando datos faltantes desde texto...')
     improved = _improve(merged)
+    
+    log.info('🧮 Calculando precio por metro cuadrado...')
     improved = _compute_pxm2(improved)
     
+    # Estadísticas antes del filtrado
+    precio_validos = improved['precio'].notna().sum()
+    area_validos = improved['area_m2'].notna().sum()
+    pxm2_validos = improved['PxM2'].notna().sum()
+    
+    log.info('📊 ESTADÍSTICAS PRE-FILTRADO:')
+    log.info(f'   • Total propiedades: {len(improved):,}')
+    log.info(f'   • Con precio válido: {precio_validos:,}')
+    log.info(f'   • Con área válida: {area_validos:,}')
+    log.info(f'   • Con PxM2 calculado: {pxm2_validos:,}')
+    
+    if not improved.empty:
+        log.info('🏠 DISTRIBUCIÓN POR TIPO Y OPERACIÓN:')
+        combinaciones = improved.groupby(['tipo_propiedad', 'operacion']).size().reset_index(name='count')
+        for _, combo in combinaciones.iterrows():
+            log.info(f'   • {combo["tipo_propiedad"]}-{combo["operacion"]}: {combo["count"]:,} propiedades')
+    
     # Aplicar filtros específicos por tipo de propiedad
+    log.info('🔍 Aplicando filtros lógicos por tipo de propiedad...')
     valid, invalid = _logic_filter(improved)
     
+    # Estadísticas de filtrado
+    total_eliminadas = len(invalid)
+    tasa_retencion = (len(valid) / len(improved) * 100) if len(improved) > 0 else 0
+    
+    log.info('📊 RESULTADOS DEL FILTRADO:')
+    log.info(f'   • Propiedades válidas: {len(valid):,}')
+    log.info(f'   • Propiedades eliminadas: {total_eliminadas:,}')
+    log.info(f'   • Tasa de retención: {tasa_retencion:.1f}%')
+    
+    # Análisis de motivos de eliminación
+    if total_eliminadas > 0:
+        log.info('⚠️ MOTIVOS DE ELIMINACIÓN:')
+        motivos_count = {}
+        for motivo_str in invalid['motivos_eliminacion']:
+            for motivo in str(motivo_str).split(';'):
+                motivos_count[motivo] = motivos_count.get(motivo, 0) + 1
+        
+        for motivo, count in sorted(motivos_count.items(), key=lambda x: x[1], reverse=True):
+            log.info(f'   • {motivo}: {count:,} propiedades')
+    
     out_valid = valid[[c for c in NUM_KEEP_COLS if c in valid.columns]].copy()
-    write_csv(out_valid, os.path.join(base_dir, f'5.Num_Corroborado_{periodo}.csv'))
+    output_path = os.path.join(base_dir, f'5.Num_Corroborado_{periodo}.csv')
+    write_csv(out_valid, output_path)
+    
+    log.info('💾 ARCHIVO VÁLIDO GENERADO:')
+    log.info(f'   • Ruta: {output_path}')
+    log.info(f'   • Propiedades: {len(out_valid):,}')
+    log.info(f'   • Columnas: {len(out_valid.columns)}')
+    log.info(f'   • Tamaño: {os.path.getsize(output_path) / 1024 / 1024:.2f} MB')
     
     if len(invalid) > 0:
         elim_dir = ensure_dir(path_base('Datos_Filtrados','Eliminados', periodo))
-        write_csv(invalid, os.path.join(elim_dir, f'paso5_invalidos_{periodo}.csv'))
+        invalid_path = os.path.join(elim_dir, f'paso5_invalidos_{periodo}.csv')
+        write_csv(invalid, invalid_path)
+        log.info('💾 ARCHIVO DE PROPIEDADES INVÁLIDAS:')
+        log.info(f'   • Ruta: {invalid_path}')
+        log.info(f'   • Propiedades eliminadas: {len(invalid):,}')
+        log.info(f'   • Tamaño: {os.path.getsize(invalid_path) / 1024 / 1024:.2f} MB')
     
-    log.info(f'Válidos: {len(valid)}, Inválidos: {len(invalid)} - Filtros específicos por tipo de propiedad aplicados')
+    # Resumen final por ciudad
+    if not out_valid.empty:
+        log.info('🏙️ DISTRIBUCIÓN FINAL POR CIUDAD:')
+        for ciudad, count in out_valid['Ciudad'].value_counts().head(10).items():
+            log.info(f'   • {ciudad}: {count:,} propiedades válidas')
     
-    return os.path.join(base_dir, f'5.Num_Corroborado_{periodo}.csv')
+    log.info('✅ STEP 5 COMPLETADO EXITOSAMENTE')
+    log.info('=' * 80)
+    
+    return output_path
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Paso 5 Analisis Logico con Condiciones Específicas por Tipo de Propiedad')

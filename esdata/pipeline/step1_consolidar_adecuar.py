@@ -30,7 +30,23 @@ COLUMN_NAME_MAPPING = {
     'Características generales': 'Caracteristicas_generales',
     'características generales': 'Caracteristicas_generales',
     'CARACTERÍSTICAS GENERALES': 'Caracteristicas_generales',
-    'caracteristicas generales': 'Caracteristicas_generales'
+    'caracteristicas generales': 'Caracteristicas_generales',
+    # Mapeos críticos para datos principales
+    'Tipo de Propiedad': 'tipo_propiedad',
+    'tipo de propiedad': 'tipo_propiedad', 
+    'TIPO DE PROPIEDAD': 'tipo_propiedad',
+    'Superficie': 'area_m2',
+    'superficie': 'area_m2',
+    'SUPERFICIE': 'area_m2',
+    'Operación': 'operacion',
+    'OPERACIÓN': 'operacion',
+    'Precio': 'precio',
+    'PRECIO': 'precio',
+    'Estacionamiento': 'estacionamientos',
+    'estacionamiento': 'estacionamientos',
+    'ESTACIONAMIENTO': 'estacionamientos',
+    'Recamaras': 'recamaras',
+    'RECAMARAS': 'recamaras'
 }
 
 RE_COORD = re.compile(r'center=([+-]?\d+\.?\d*),([+-]?\d+\.?\d*)')
@@ -165,6 +181,8 @@ _PERIODO_OVERRIDE: str|None = None
 
 FLOAT_CLEAN_RE = re.compile(r'[^\d.,]')
 NUM_IN_TEXT_RE = re.compile(r'(\d+[\d.,]*)')
+# Patrón específico para extraer precios con formatos: rentaUSD 1,650 / ventaMN 10,650,000 / etc
+PRECIO_RE = re.compile(r'(?:renta|venta)(?:USD|MN|usd|mn)?\s+([0-9,]+(?:\.[0-9]+)?)', re.IGNORECASE)
 BANOS_RE = re.compile(r'(\d+(?:\.\d+)?)\s*ba', re.IGNORECASE)
 REC_RE = re.compile(r'(\d+)\s*rec', re.IGNORECASE)
 ESTAC_RE = re.compile(r'(\d+)\s*estac', re.IGNORECASE)
@@ -174,7 +192,7 @@ TIEMPO_MES_RE = re.compile(r'hace\s+(\d+)\s*mes', re.IGNORECASE)
 ANTIG_ANIOS_RE = re.compile(r'(\d+)\s*año', re.IGNORECASE)
 
 TEXT_COLUMNS_DESCONOCIDO = [
-    'PaginaWeb','Ciudad','Colonia','tipo_propiedad','operacion','direccion','ubicacion_url','titulo','descripcion',
+    'PaginaWeb','Ciudad','Colonia','tipo_propiedad','direccion','ubicacion_url','titulo','descripcion',
     'anunciante','codigo_anunciante','codigo_inmuebles24','Caracteristicas_generales','Servicios','Amenidades','Exteriores'
 ]
 
@@ -195,6 +213,39 @@ def _clean_number(val):
     try:
         return float(s) if s!='' else None
     except: return None
+
+def _extract_precio(val):
+    """Extrae precio de formatos como: rentaUSD 1,650, ventaMN 10,650,000, etc.
+    Convierte USD a MN multiplicando por 20 (1 USD = 20 MN)"""
+    if pd.isna(val):
+        return None
+    
+    s = str(val).strip()
+    if not s or s.lower() == 'desconocido':
+        return None
+    
+    # Intentar primero con el patrón específico de precio
+    match = PRECIO_RE.search(s)
+    if match:
+        precio_str = match.group(1)
+        # Limpiar comas y convertir a número
+        try:
+            precio = float(precio_str.replace(',', ''))
+            # Detectar si está en USD y convertir a MN
+            if 'usd' in s.lower():
+                precio = precio * 20  # 1 USD = 20 MN
+                log.debug(f'Precio convertido de USD a MN: {precio_str} -> {precio}')
+            return precio
+        except ValueError:
+            pass
+    
+    # Si no funciona el patrón específico, usar limpieza general
+    # pero solo si el string contiene números
+    if any(c.isdigit() for c in s):
+        return _clean_number(val)
+    
+    # Si no hay números, retornar None
+    return None
 
 def _extract_coords(url):
     if not isinstance(url,str):
@@ -439,6 +490,20 @@ def normalizar(df: pd.DataFrame) -> pd.DataFrame:
     if drop_cols:
         df = df.drop(columns=drop_cols)
     
+    # APLICAR MAPEO DE COLUMNAS ANTES DE ELIMINAR DUPLICADOS
+    # Esto es crítico para no perder datos importantes
+    for old_name, new_name in COLUMN_NAME_MAPPING.items():
+        if old_name in df.columns:
+            if new_name in df.columns:
+                # Si ya existe la columna destino, combinar valores no nulos
+                log.warning(f'Columna {new_name} ya existe. Combinando con {old_name}')
+                mask = df[new_name].isna() & df[old_name].notna()
+                df.loc[mask, new_name] = df.loc[mask, old_name]
+                df = df.drop(columns=[old_name])
+            else:
+                df = df.rename(columns={old_name: new_name})
+                log.debug(f'Columna renombrada: {old_name} → {new_name}')
+    
     # Eliminar columnas duplicadas e innecesarias (las que mencionas de columnas 33-41)
     # PERO manteniendo las columnas esenciales del pipeline
     unwanted_columns = [
@@ -566,8 +631,13 @@ def normalizar(df: pd.DataFrame) -> pd.DataFrame:
     
     # Fecha
     df['Fecha_Scrap'] = df['Fecha_Scrap'].apply(_norm_fecha)
-    # Numeros base
-    for num_col in ['area_m2','precio','mantenimiento','area_total','area_cubierta']:
+    # Precio con función específica
+    if 'precio' in df.columns:
+        df['precio'] = df['precio'].apply(_extract_precio)
+    else:
+        log.warning('Columna precio no encontrada en el DataFrame')
+    # Otros números base (excepto precio)
+    for num_col in ['area_m2','mantenimiento','area_total','area_cubierta']:
         if num_col in df.columns:
             df[num_col]=df[num_col].apply(_clean_number)
         else:
@@ -658,16 +728,60 @@ def run(output_period: str|None=None, include_waiting_prev: bool=True):
     global _PERIODO_OVERRIDE
     period = output_period or PERIODO_ACTUAL
     _PERIODO_OVERRIDE = period
-    log.info(f'Iniciando Paso 1 Consolidacion Periodo {period} (include_waiting_prev={include_waiting_prev})')
+    
+    log.info('=' * 80)
+    log.info('🚀 INICIANDO STEP 1: CONSOLIDACIÓN Y ADECUACIÓN')
+    log.info('=' * 80)
+    log.info(f'📅 Periodo: {period}')
+    log.info(f'📁 Incluir esperando previos: {include_waiting_prev}')
+    
+    # Cargar datos
+    log.info('📥 Cargando archivos CSV fuente...')
     df = cargar_csvs_fuente(period, include_waiting_prev=include_waiting_prev)
-    before=len(df)
+    
+    # Estadísticas iniciales
+    initial_count = len(df)
+    initial_cols = len(df.columns)
+    log.info(f'✅ Datos cargados: {initial_count:,} propiedades con {initial_cols} columnas')
+    
+    if not df.empty:
+        log.info(f'📊 Fuentes de datos encontradas: {df["PaginaWeb"].value_counts().to_dict()}')
+        log.info(f'🏙️ Ciudades detectadas: {df.get("Ciudad", pd.Series()).nunique()} únicas')
+        log.info(f'🏠 Tipos de propiedad: {df.get("tipo_propiedad", pd.Series()).nunique()} diferentes')
+        log.info(f'💰 Operaciones: {df.get("operacion", pd.Series()).nunique()} tipos')
+    
+    # Normalización
+    log.info('🔄 Iniciando proceso de normalización...')
     df = normalizar(df)
-    after=len(df)
-    log.info(f'Registros antes={before} despues={after} (no se eliminan)')
+    
+    # Estadísticas finales
+    final_count = len(df)
+    final_cols = len(df.columns)
+    
+    log.info('📈 RESUMEN DE NORMALIZACIÓN:')
+    log.info(f'   • Propiedades procesadas: {initial_count:,} → {final_count:,}')
+    log.info(f'   • Columnas procesadas: {initial_cols} → {final_cols}')
+    log.info(f'   • IDs únicos generados: {df["id"].nunique():,}')
+    
+    # Estadísticas post-normalización
+    if not df.empty:
+        log.info(f'   • Tipos estandarizados: {df["tipo_propiedad"].value_counts().to_dict()}')
+        log.info(f'   • Operaciones estandarizadas: {df["operacion"].value_counts().to_dict()}')
+        log.info(f'   • Propiedades con precio válido: {df["precio"].notna().sum():,}')
+        log.info(f'   • Propiedades con área válida: {df["area_m2"].notna().sum():,}')
+        log.info(f'   • Propiedades con coordenadas: {(df["longitud"].notna() & df["latitud"].notna()).sum():,}')
+    
+    # Guardar archivo
     out_dir = ensure_dir(os.path.join(path_consolidados(), f'{period}'))
     out_path = os.path.join(out_dir, f'1.Consolidado_Adecuado_{period}.csv')
-    write_csv(df,out_path)
-    log.info(f'Archivo generado {out_path}')
+    write_csv(df, out_path)
+    
+    log.info('💾 ARCHIVO GENERADO:')
+    log.info(f'   • Ruta: {out_path}')
+    log.info(f'   • Tamaño: {os.path.getsize(out_path) / 1024 / 1024:.2f} MB')
+    log.info('✅ STEP 1 COMPLETADO EXITOSAMENTE')
+    log.info('=' * 80)
+    
     return out_path
 
 if __name__=='__main__':

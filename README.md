@@ -1,4 +1,272 @@
-# ESDATA_Epsilon – Plataforma de Análisis Inmobiliario
+# 🏠 ESDATA_Epsilon - Pipeline Inmobiliario Inteligente
+
+## 📋 Descripción
+
+ESDATA_Epsilon es un **pipeline completo de procesamiento de datos inmobiliarios** que automatiza la consolidación, estandarización, validación, análisis geoespacial y generación de reportes para propiedades inmobiliarias en Guadalajara y Zapopan, México.
+
+El sistema procesa datos de múltiples fuentes (principalmente Inmuebles24) y los transforma en información estructurada y confiable para análisis de mercado inmobiliario.
+
+## 🚀 Características Principales
+
+### 🔄 **Pipeline Automatizado**
+- **8 pasos secuenciales** de procesamiento de datos
+- **Logging comprehensivo** con emojis y estadísticas detalladas
+- **Validación automática** en cada etapa
+- **Manejo de errores** robusto con archivos de respaldo
+
+### 🗺️ **Análisis Geoespacial**
+- **Asignación automática** de colonias usando polígonos GeoJSON
+- **Validación de coordenadas** y detección de inconsistencias
+- **Corrección de ubicaciones** basada en geometrías precisas
+- **Cobertura completa** de 1,062 colonias en ambas ciudades
+
+### 💰 **Procesamiento de Precios**
+- **Extracción inteligente** de precios con múltiples formatos
+- **Conversión automática** USD → MN (1 USD = 20 MN)
+- **Validación por rangos** específicos por tipo de propiedad
+- **Detección de outliers** y valores atípicos
+
+### 📊 **Análisis Estadístico**
+- **Estadísticas descriptivas** exhaustivas
+- **Detección automática** de tipos de variables
+- **Análisis de normalidad** y distribuciones
+- **Reportes por colonias** con métricas especializadas
+
+### 🎯 **Control de Calidad**
+- **Filtrado lógico** por tipo de propiedad y operación
+- **Eliminación de duplicados** con criterios jerárquicos
+- **Validación cruzada** de consistencia de datos
+- **Reportes de propiedades** problemáticas
+
+## 🏗️ Arquitectura del Pipeline
+
+```mermaid
+graph TD
+    A[📥 Datos Fuente] --> B[Step 1: Consolidación]
+    B --> C[Step 2: Geoespacial]
+    C --> D[Step 3: Versiones Especiales]
+    D --> E[Step 4: Análisis de Texto]
+    E --> F[Step 5: Validación Lógica]
+    F --> G[Step 6: Eliminación Duplicados]
+    G --> H[Step 7: Estadísticas Variables]
+    H --> I[Step 8: Resumen Colonias]
+    I --> J[📊 Reportes Finales]
+```
+
+### 📝 **Descripción Detallada de Pasos**
+
+| Paso | Nombre | Descripción | Entrada | Salida |
+|------|--------|-------------|---------|---------|
+| **1** | Consolidación y Adecuación | Unifica archivos CSV, normaliza columnas, estandariza valores, extrae precios USD/MN | Múltiples CSV | `1.Consolidado_Adecuado_*.csv` |
+| **2** | Procesamiento Geoespacial | Asigna colonias y ciudades usando GeoJSON, valida coordenadas | Consolidado | `2.Consolidado_ConColonia_*.csv` |
+| **3** | Versiones Especiales | Genera versiones filtradas para análisis específicos | Con Colonias | Versiones especializadas |
+| **4** | Análisis de Texto | Procesa variables textuales, extrae características | Versiones | Texto procesado |
+| **5** | Validación Lógica | Aplica filtros de calidad por tipo de propiedad y operación | Texto | `Final_Num_*.csv` |
+| **6** | Eliminación Duplicados | Remueve duplicados con criterios jerárquicos, mantiene consistencia | Validado | `Final_*_*.csv` (3 archivos) |
+| **7** | Estadísticas Variables | Calcula estadísticas descriptivas por variable | Final | Reportes estadísticos |
+| **8** | Resumen Colonias | Genera reportes por colonia, tablero maestro, puntos finales | Estadísticas | Reportes por colonia |
+
+## 🛠️ Instalación y Configuración
+
+### ✅ **Prerrequisitos**
+
+```bash
+Python >= 3.9
+pandas >= 1.5.0
+geopandas >= 0.12.0
+shapely >= 2.0.0
+numpy >= 1.21.0
+scipy >= 1.7.0
+```
+
+### 📦 **Instalación**
+
+```bash
+# Clonar repositorio
+git clone https://github.com/esdataapp/ESDATA_Epsilon.git
+cd ESDATA_Epsilon
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Verificar estructura de directorios
+python -c "from esdata.utils.paths import verificar_estructura; verificar_estructura()"
+```
+
+### 🗂️ **Estructura de Directorios**
+
+```
+ESDATA_Epsilon/
+├── 📂 Base_de_Datos/           # Datos fuente por periodo
+│   └── Sep25/                  # Ejemplo: datos Sept 2025
+├── 📂 N1_Tratamiento/          # Datos procesados
+│   ├── Consolidados/           # Archivos principales del pipeline
+│   └── Geolocalizacion/        # GeoJSON de colonias
+├── 📂 N2_Estadisticas/         # Reportes estadísticos
+├── 📂 N5_Resultados/           # Resultados finales
+├── 📂 Datos_Filtrados/         # Propiedades eliminadas
+├── 📂 esdata/                  # Código fuente modular
+│   ├── pipeline/               # Pasos 1, 3, 5, 6
+│   ├── geo/                    # Procesamiento geoespacial
+│   ├── text/                   # Análisis de texto
+│   ├── estadistica/            # Estadísticas y reportes
+│   └── utils/                  # Utilidades comunes
+└── 📂 docs/                    # Documentación técnica
+```
+
+## 🚀 Uso del Sistema
+
+### ⚡ **Ejecución Rápida**
+
+```bash
+# Ejecutar pipeline completo para periodo Sep25
+python -m esdata.pipeline.step1_consolidar_adecuar Sep25
+python -m esdata.geo.step2_procesamiento_geoespacial Sep25
+python -m esdata.pipeline.step3_versiones_especiales Sep25
+python -m esdata.text.step4_analisis_variables_texto Sep25
+python -m esdata.pipeline.step5_analisis_logico_corroboracion Sep25
+python -m esdata.pipeline.step6_remover_duplicados Sep25
+python -m esdata.estadistica.step7_estadisticas_variables Sep25
+python -m esdata.estadistica.step8_resumen_colonias Sep25
+```
+
+### 📊 **Análisis de Resultados**
+
+```bash
+# Ver estadísticas generales
+python -c "
+import pandas as pd
+df = pd.read_csv('N5_Resultados/Nivel_1/CSV/Final_Puntos_Sep25.csv')
+print(f'Total propiedades: {len(df):,}')
+print(f'Ciudades: {df.Ciudad.value_counts()}')
+print(f'Tipos: {df.tipo_propiedad.value_counts()}')
+print(f'Operaciones: {df.operacion.value_counts()}')
+"
+```
+
+## 🔧 Configuración Avanzada
+
+### 🎛️ **Variables de Entorno**
+
+```bash
+# Configurar logging
+export ESDATA_LOG_LEVEL=INFO
+export ESDATA_LOG_FILE=pipeline.log
+
+# Configurar rutas personalizadas
+export ESDATA_BASE_PATH=/ruta/personalizada
+export ESDATA_GEOJSON_PATH=/ruta/geojson
+```
+
+### 📋 **Archivos de Configuración**
+
+- **`Lista de Variables Orquestacion.csv`**: Mapeos de estandarización
+- **GeoJSON Colonias**: Polígonos precisos de colonias
+- **Condiciones por Tipo**: Rangos de validación en `step5_analisis_logico_corroboracion.py`
+
+## 🏆 Mejoras Implementadas
+
+### 🔥 **Recientes (Septiembre 2025)**
+
+1. **🎯 Extracción de Precios Mejorada**
+   - Reconoce formatos: `rentaUSD 1,650`, `ventaMN 10,650,000`
+   - Conversión automática USD→MN (1:20)
+   - **Resultado**: 100% propiedades con precio válido vs 82.5% anterior
+
+2. **🗺️ Coherencia Geoespacial**
+   - Lógica coherente: sin colonia → sin ciudad
+   - Eliminación de inconsistencias lógicas
+   - **Resultado**: 998 propiedades sin colonia = 998 sin ciudad
+
+3. **📊 Logging Comprehensivo**
+   - Estadísticas detalladas en cada paso
+   - Emojis para identificación rápida
+   - Reportes de cobertura y calidad
+
+4. **🔄 Mapeo de Columnas Robusto**
+   - Prevención de pérdida de datos durante normalización
+   - Combinación inteligente de columnas duplicadas
+   - Preservación de datos críticos
+
+5. **🎯 Validación de Operaciones**
+   - Corrección de variable `operacion` con valores reales
+   - Eliminación de sobrescritura con "Desconocido"
+   - **Resultado**: Ven: 22,285 + Ren: 3,566 propiedades
+
+6. **📈 Tablero Maestro de Colonias**
+   - Cobertura completa de 1,062 colonias
+   - Análisis de gaps de información
+   - Métricas de penetración por ciudad
+
+## 📈 Métricas de Rendimiento
+
+### 🎯 **Calidad de Datos** (Sep25)
+
+| Métrica | Valor | Porcentaje |
+|---------|-------|------------|
+| **Total propiedades procesadas** | 25,851 | 100% |
+| **Con precio válido** | 25,851 | 100% |
+| **Con área válida** | 25,781 | 99.7% |
+| **Con coordenadas** | 25,815 | 99.9% |
+| **Con colonia asignada** | 24,853 | 96.1% |
+| **Propiedades finales válidas** | 24,853 | 96.1% |
+
+### 🏙️ **Distribución Geográfica**
+
+| Ciudad | Propiedades | Porcentaje | Colonias |
+|--------|-------------|------------|----------|
+| **Zapopan** | 17,229 | 69.3% | 770 |
+| **Guadalajara** | 7,624 | 30.7% | 292 |
+| **TOTAL** | 24,853 | 100% | 1,062 |
+
+### 🏠 **Tipos de Propiedad**
+
+| Tipo | Cantidad | Porcentaje |
+|------|----------|------------|
+| **Casa (Cas)** | 12,864 | 51.8% |
+| **Departamento (Dep)** | 8,084 | 32.5% |
+| **Terreno/Lote** | 1,599 | 6.4% |
+| **Casa en Condominio (CasC)** | 1,228 | 4.9% |
+| **Local Comercial (LocC)** | 668 | 2.7% |
+| **Oficina (Ofc)** | 410 | 1.6% |
+
+## 🤝 Contribuciones
+
+### 🔧 **Desarrollo**
+
+1. Fork del repositorio
+2. Crear branch: `git checkout -b feature/nueva-funcionalidad`
+3. Commit cambios: `git commit -m "Agregar nueva funcionalidad"`
+4. Push branch: `git push origin feature/nueva-funcionalidad`
+5. Crear Pull Request
+
+### 🐛 **Reportar Issues**
+
+- Usar templates de issues
+- Incluir logs relevantes
+- Especificar periodo de datos
+- Adjuntar archivos de muestra si es necesario
+
+## 📚 Documentación Adicional
+
+- **[Flujo de Trabajo](FLUJO.md)**: Proceso detallado paso a paso
+- **[Configuración](docs/configuracion.md)**: Parámetros y personalización
+- **[API Reference](docs/api/)**: Documentación técnica de módulos
+- **[Troubleshooting](docs/troubleshooting.md)**: Solución de problemas comunes
+
+## 📄 Licencia
+
+Este proyecto está licenciado bajo [MIT License](LICENSE) - ver archivo para detalles.
+
+---
+
+**🏠 ESDATA_Epsilon** - *Pipeline Inmobiliario Inteligente*  
+📧 Contacto: [esdata@example.com](mailto:esdata@example.com)  
+🌐 Sitio Web: [esdata.example.com](https://esdata.example.com)
+
+---
+
+*Última actualización: Septiembre 2025* ✨ – Plataforma de Análisis Inmobiliario
 
 Pipeline modular + Dashboard analítico para el estudio de propiedades inmobiliarias (Venta y Renta) en Guadalajara y Zapopan (extensible a otras plazas).
 
