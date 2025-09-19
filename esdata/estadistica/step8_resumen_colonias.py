@@ -17,7 +17,7 @@ Uso CLI:
 Si no se proporciona <Periodo>, se usa el periodo actual (mes abreviado + año, ej. Sep25).
 """
 from __future__ import annotations
-import os, re, json
+import os, re, json, glob
 import pandas as pd
 from esdata.utils.paths import (
     path_results_level, path_resultados_tablas_periodo, path_esperando,
@@ -116,6 +116,146 @@ def resumen_final(df: pd.DataFrame, periodo: str, ciudad: str, oper: str, tipo: 
         esperar_path = os.path.join(esperando_dir, f'esperando_{c_s}_{o_s}_{t_s}_{periodo}.csv')
         write_csv(esperar_df, esperar_path)
     return pd.DataFrame(final_rows)
+
+def cargar_todas_las_colonias():
+    """Cargar todas las colonias de los archivos GeoJSON"""
+    import glob
+    import json
+    
+    colonias_path = "N1_Tratamiento/Geolocalizacion/Colonias/"
+    geojson_files = glob.glob(os.path.join(colonias_path, "*.geojson"))
+    
+    todas_colonias = []
+    for geojson_file in geojson_files:
+        log.info(f'📍 Cargando colonias de: {os.path.basename(geojson_file)}')
+        
+        with open(geojson_file, 'r', encoding='utf-8') as f:
+            geojson_data = json.load(f)
+        
+        # Extraer el nombre de la ciudad del archivo
+        filename = os.path.basename(geojson_file)
+        if 'Guadalajara' in filename:
+            ciudad = 'Gdl'
+        elif 'Zapopan' in filename:
+            ciudad = 'Zap'
+        else:
+            ciudad = 'Desconocido'
+        
+        # Extraer todas las colonias
+        for feature in geojson_data['features']:
+            properties = feature.get('properties', {})
+            colonia_name = properties.get('NOMCOL1', 'Desconocido')
+            
+            todas_colonias.append({
+                'Ciudad': ciudad,
+                'Colonia': colonia_name
+            })
+    
+    colonias_df = pd.DataFrame(todas_colonias).drop_duplicates()
+    log.info(f'📋 Total colonias únicas cargadas: {len(colonias_df)}')
+    
+    return colonias_df
+
+def generar_resumen_transversal(df: pd.DataFrame, periodo: str):
+    """Generar CSV de resumen transversal con colonias como filas y combinaciones como columnas"""
+    log.info('📊 Generando resumen transversal de colonias...')
+    
+    # Cargar todas las colonias de los archivos GeoJSON
+    todas_colonias = cargar_todas_las_colonias()
+    
+    # Obtener todas las combinaciones únicas Ciudad-Operación-Tipo de los datos
+    combos = df[['Ciudad','operacion','tipo_propiedad']].drop_duplicates()
+    log.info(f'🔍 Combinaciones encontradas: {len(combos)}')
+    
+    # Crear DataFrame base con todas las colonias
+    resumen_transversal = todas_colonias.copy()
+    resumen_transversal['Periodo'] = periodo
+    
+    # Reordenar columnas
+    resumen_transversal = resumen_transversal[['Periodo', 'Ciudad', 'Colonia']]
+    
+    # Para cada combinación, crear columnas y llenar datos
+    for _, combo in combos.iterrows():
+        ciudad = combo['Ciudad']
+        oper = combo['operacion'] 
+        tipo = combo['tipo_propiedad']
+        
+        # Crear identificador de columna corto
+        tipo_short = _sanitize(tipo)[:3]  # Acortar tipo a 3 caracteres
+        col_prefix = f"{ciudad}_{oper}_{tipo_short}"
+        
+        log.info(f'   📋 Procesando: {col_prefix}')
+        
+        # Filtrar datos para esta combinación
+        datos_combo = df[
+            (df['Ciudad'] == ciudad) & 
+            (df['operacion'] == oper) & 
+            (df['tipo_propiedad'] == tipo)
+        ]
+        
+        # Calcular estadísticas por colonia para esta combinación
+        if len(datos_combo) > 0:
+            stats_combo = datos_combo.groupby('Colonia').agg({
+                'id': 'count',  # número de propiedades
+                'precio': ['min', 'mean', 'max'],
+                'area_m2': ['min', 'mean', 'max'],
+                'PxM2': ['min', 'mean', 'max']
+            }).round(2)
+            
+            # Aplanar nombres de columnas
+            stats_combo.columns = [f'{col}_{stat}' for col, stat in stats_combo.columns]
+            stats_combo = stats_combo.rename(columns={'id_count': 'n'})
+            stats_combo = stats_combo.reset_index()
+            
+            # Renombrar columnas con el prefijo de la combinación
+            col_mapping = {'n': f'{col_prefix}_n'}
+            for var in ['precio', 'area_m2', 'PxM2']:
+                for stat in ['min', 'mean', 'max']:
+                    old_col = f'{var}_{stat}'
+                    new_col = f'{col_prefix}_{var}_{stat}'
+                    col_mapping[old_col] = new_col
+            
+            stats_combo = stats_combo.rename(columns=col_mapping)
+            
+            # Hacer merge con el resumen transversal
+            merge_cols = ['Ciudad', 'Colonia'] if ciudad in todas_colonias['Ciudad'].unique() else ['Colonia']
+            resumen_transversal = resumen_transversal.merge(
+                stats_combo, 
+                on=merge_cols, 
+                how='left'
+            )
+        else:
+            # No hay datos para esta combinación, crear columnas vacías
+            empty_cols = [f'{col_prefix}_n']
+            for var in ['precio', 'area_m2', 'PxM2']:
+                for stat in ['min', 'mean', 'max']:
+                    empty_cols.append(f'{col_prefix}_{var}_{stat}')
+            
+            for col in empty_cols:
+                resumen_transversal[col] = None
+    
+    # Guardar archivo
+    resumen_dir = ensure_dir(os.path.join(path_results_level(1), 'Resumen', periodo))
+    resumen_path = os.path.join(resumen_dir, f'Resumen_Transversal_Colonias_{periodo}.csv')
+    write_csv(resumen_transversal, resumen_path)
+    
+    # Estadísticas del resumen
+    total_colonias = len(resumen_transversal)
+    total_combos = len(combos)
+    
+    log.info('📊 RESUMEN TRANSVERSAL GENERADO:')
+    log.info(f'   • Total colonias: {total_colonias:,}')
+    log.info(f'   • Total combinaciones: {total_combos}')
+    log.info(f'   • Columnas totales: {len(resumen_transversal.columns)}')
+    log.info(f'   • Archivo: {resumen_path}')
+    
+    # Análisis de cobertura por ciudad
+    log.info('🏙️ COLONIAS POR CIUDAD:')
+    cobertura = resumen_transversal['Ciudad'].value_counts()
+    for ciudad, count in cobertura.items():
+        log.info(f'   • {ciudad}: {count:,} colonias')
+    
+    return resumen_path
 
 def generar_tablero_maestro_colonias(df: pd.DataFrame, periodo: str):
     """Generar tablero maestro con TODAS las colonias del GeoJSON (tengan datos o no)"""
@@ -330,6 +470,156 @@ def generar_resumen_consolidado(df: pd.DataFrame, periodo: str):
     
     return resumen_path
 
+def generar_resumen_transversal_completo(periodo: str):
+    """
+    Genera un CSV de resumen transversal donde:
+    - Filas: Todas las colonias de los archivos CSV existentes
+    - Columnas: Combinaciones de Ciudad-Operación-Tipo (Gdl_Ren_Dep, Zap_Ven_Cas, etc.)
+    - Valores: Estadísticas correspondientes a cada colonia en cada combinación
+    """
+    log.info('🔄 Iniciando generación de resumen transversal...')
+    
+    # 1. Buscar todos los CSV en N5_Resultados/Nivel_1/CSV/Tablas/Sep25/
+    tablas_dir = os.path.join(path_results_level(1), 'Tablas', periodo)
+    csv_pattern = os.path.join(tablas_dir, '*_inicial.csv')
+    csv_files = glob.glob(csv_pattern)
+    
+    log.info(f'📊 Archivos CSV encontrados: {len(csv_files)}')
+    log.info(f'📁 Directorio buscado: {tablas_dir}')
+    
+    if len(csv_files) == 0:
+        log.warning('⚠️ No se encontraron archivos CSV para procesar')
+        return None
+    
+    # 2. Obtener todas las colonias únicas de todos los CSV
+    todas_colonias = set()
+    datos_por_combo = {}
+    
+    for csv_file in csv_files:
+        try:
+            # Extraer información del nombre del archivo
+            basename = os.path.basename(csv_file)
+            log.info(f'   📄 Procesando: {basename}')
+            
+            # Formato esperado: Gdl_Ren_Dep_Sep25_inicial.csv
+            if '_inicial.csv' in basename:
+                parts = basename.replace('_inicial.csv', '').split('_')
+                if len(parts) >= 4:
+                    ciudad = parts[0]
+                    operacion = parts[1]
+                    tipo = '_'.join(parts[2:-1])  # Unir partes del tipo si tiene guiones
+                    
+                    # Crear nombre de columna
+                    tipo_short = tipo.replace(' ', '').replace('/', '')[:10]  # Acortar tipo
+                    columna_base = f'{ciudad}_{operacion}_{tipo_short}'
+                    
+                    # Leer el CSV
+                    df_csv = read_csv(csv_file)
+                    
+                    if 'Colonia' in df_csv.columns:
+                        # Agregar colonias al conjunto
+                        colonias_en_csv = df_csv['Colonia'].dropna().unique()
+                        todas_colonias.update(colonias_en_csv)
+                        
+                        # Guardar datos por combinación
+                        datos_combo = {}
+                        for _, row in df_csv.iterrows():
+                            colonia = row['Colonia']
+                            datos_combo[colonia] = {
+                                'n': row.get('n', 0),
+                                'precio_mean': row.get('precio_mean', None),
+                                'precio_min': row.get('precio_min', None),
+                                'precio_max': row.get('precio_max', None),
+                                'area_m2_mean': row.get('area_m2_mean', None),
+                                'PxM2_mean': row.get('PxM2_mean', None)
+                            }
+                        
+                        datos_por_combo[columna_base] = datos_combo
+                        log.info(f'   ✅ {columna_base}: {len(colonias_en_csv)} colonias')
+                    else:
+                        log.warning(f'   ⚠️ No se encontró columna "Colonia" en {basename}')
+                else:
+                    log.warning(f'   ⚠️ Formato de nombre inesperado: {basename}')
+            
+        except Exception as e:
+            log.error(f'   ❌ Error procesando {csv_file}: {e}')
+    
+    todas_colonias = sorted(list(todas_colonias))
+    log.info(f'📍 Total de colonias únicas encontradas: {len(todas_colonias)}')
+    
+    if len(todas_colonias) == 0:
+        log.warning('⚠️ No se encontraron colonias para procesar')
+        return None
+    
+    # 3. Crear DataFrame base con todas las colonias
+    resumen_transversal = pd.DataFrame({'Colonia': todas_colonias})
+    resumen_transversal = resumen_transversal.sort_values('Colonia').reset_index(drop=True)
+    
+    # 4. Agregar columnas para cada combinación
+    for combo_name, combo_data in datos_por_combo.items():
+        log.info(f'   📊 Agregando columnas para: {combo_name}')
+        
+        # Agregar múltiples métricas por combinación
+        resumen_transversal[f'{combo_name}_n'] = resumen_transversal['Colonia'].map(
+            lambda x: combo_data.get(x, {}).get('n')
+        )
+        
+        resumen_transversal[f'{combo_name}_precio_mean'] = resumen_transversal['Colonia'].map(
+            lambda x: combo_data.get(x, {}).get('precio_mean')
+        )
+        
+        resumen_transversal[f'{combo_name}_precio_min'] = resumen_transversal['Colonia'].map(
+            lambda x: combo_data.get(x, {}).get('precio_min')
+        )
+        
+        resumen_transversal[f'{combo_name}_precio_max'] = resumen_transversal['Colonia'].map(
+            lambda x: combo_data.get(x, {}).get('precio_max')
+        )
+        
+        resumen_transversal[f'{combo_name}_area_m2_mean'] = resumen_transversal['Colonia'].map(
+            lambda x: combo_data.get(x, {}).get('area_m2_mean')
+        )
+        
+        resumen_transversal[f'{combo_name}_PxM2_mean'] = resumen_transversal['Colonia'].map(
+            lambda x: combo_data.get(x, {}).get('PxM2_mean')
+        )
+    
+    # 5. Guardar resumen transversal
+    resumen_dir = ensure_dir(os.path.join(path_results_level(1), 'Resumen', periodo))
+    resumen_transversal_path = os.path.join(resumen_dir, f'Resumen_Transversal_{periodo}.csv')
+    
+    write_csv(resumen_transversal, resumen_transversal_path)
+    
+    # 6. Estadísticas del resumen transversal
+    num_colonias = len(resumen_transversal)
+    num_columnas = len(resumen_transversal.columns) - 1  # excluyendo columna 'Colonia'
+    num_combinaciones = len(datos_por_combo)
+    
+    log.info('📊 RESUMEN TRANSVERSAL GENERADO:')
+    log.info(f'   • Total de colonias: {num_colonias:,}')
+    log.info(f'   • Total de combinaciones: {num_combinaciones}')
+    log.info(f'   • Total de columnas de datos: {num_columnas}')
+    log.info(f'   • Archivo: {resumen_transversal_path}')
+    
+    # Mostrar algunas estadísticas de densidad de datos
+    total_celdas = num_colonias * num_columnas
+    celdas_con_datos = 0
+    for col in resumen_transversal.columns:
+        if col != 'Colonia':
+            celdas_con_datos += resumen_transversal[col].notna().sum()
+    
+    if total_celdas > 0:
+        densidad = (celdas_con_datos / total_celdas) * 100
+        log.info(f'   • Densidad de datos: {densidad:.1f}% ({celdas_con_datos:,}/{total_celdas:,} celdas)')
+    
+    # Mostrar una muestra de los datos
+    log.info('🔍 MUESTRA DE COMBINACIONES ENCONTRADAS:')
+    for i, combo in enumerate(list(datos_por_combo.keys())[:5]):
+        num_colonias_combo = len([x for x in datos_por_combo[combo].values() if x.get('n', 0) > 0])
+        log.info(f'   • {combo}: {num_colonias_combo} colonias con datos')
+    
+    return resumen_transversal_path
+
 def run(periodo: str):
     log.info('=' * 80)
     log.info('📊 INICIANDO STEP 8: RESUMEN POR COLONIAS Y GENERACIÓN DE PUNTOS')
@@ -360,6 +650,14 @@ def run(periodo: str):
     
     # GENERAR RESUMEN CONSOLIDADO PRIMERO (con TODAS las colonias)
     generar_resumen_consolidado(df, periodo)
+    
+    # GENERAR RESUMEN TRANSVERSAL (colonias como filas, combinaciones como columnas)
+    # log.info('📊 Generando resumen transversal con todas las colonias...')
+    # generar_resumen_transversal(df, periodo)  # Comentado temporalmente debido a errores
+    
+    # GENERAR RESUMEN TRANSVERSAL COMPLETO (desde archivos CSV)
+    log.info('📊 Generando resumen transversal completo desde CSV...')
+    generar_resumen_transversal_completo(periodo)
     
     # GENERAR FINAL_PUNTOS con TODAS las propiedades (sin filtros)
     log.info('📍 Generando archivo Final_Puntos con TODAS las propiedades...')
