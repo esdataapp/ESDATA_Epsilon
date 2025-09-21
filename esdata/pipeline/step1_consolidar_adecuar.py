@@ -154,6 +154,7 @@ def standardize_value(value, variable_name):
         # Mapeos adicionales comunes
         additional_mappings = {
             'lote': 'Terr',
+            'Terreno / Lote': 'Terr',
             'lotes': 'Terr', 
             'terreno': 'Terr',
             'terrenos': 'Terr',

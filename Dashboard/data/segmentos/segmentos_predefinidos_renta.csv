@@ -1,0 +1,4 @@
+count,precio_p25,precio_mediana,precio_p75,superficie_mediana,segmento_id,segmento_nombre
+184,16500.0,19000.0,22500.0,60.0,starter_1r_1b,Starter (1R + 1-1.5B)
+505,22000.0,25603.0,30000.0,96.0,family_2r_2b,Familiar (2R + 2-2.5B)
+102,26000.0,35000.0,48875.0,161.0,premium_3r_3b,Premium (3R + 3-3.5B)

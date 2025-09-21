@@ -1,0 +1,9 @@
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap
+Gdl-Coli_CasC-090K-500_03-03-04_susan-10339-20703,Inm24,Gdl,Colinas de San Javier,Ren,CasC,500.0,3.0,4.0,90000.0,,-103.39838,20.703054,24.0,3.5,15.0,180.0,
+Gdl-Coli_CasC-025K-151_02-02-01_LizAp-10340-20709,Inm24,Gdl,Colinas de San Javier,Ren,CasC,151.0,2.0,1.0,25000.0,,-103.405626,20.709313,20.0,2.0,20.0,165.56291390728478,
+Gdl-Coun_CasC-130K-480_03-04-04_Nomad-10337-20710,Inm24,Gdl,Country Club,Ren,CasC,480.0,3.0,4.0,130000.0,5000.0,-103.373455,20.710892,60.0,4.0,8.0,270.8333333333333,
+Gdl-LaEs_CasC-014K-135_03-01-02_ARANI-10332-20712,Inm24,Gdl,La Esperanza (La Federacha),Ren,CasC,135.0,3.0,2.0,14000.0,,-103.32063,20.712861,26.0,1.5,0.0,103.70370370370372,
+Gdl-Loma_CasC-040K-325_04-02-02_Conta-10338-20688,Inm24,Gdl,Lomas de Guevara,Ren,CasC,325.0,4.0,2.0,40000.0,,-103.381417,20.688167,82.0,2.5,10.0,123.07692307692308,
+Gdl-Prov_CasC-017K-050_01-01-01_IGNAC-10337-20700,Inm24,Gdl,Providencia 3a Sección,Ren,CasC,50.0,1.0,1.0,17000.0,,-103.379309,20.700548,29.0,1.0,0.0,340.0,
+Gdl-Resi_CasC-023K-133_03-03-02_Pulpp-10339-20672,Inm24,Gdl,Residencial Chapalita,Ren,CasC,133.0,3.0,2.0,23500.0,2000.0,-103.399889,20.672534,1.0,3.5,22.0,176.69172932330827,
+Gdl-Sant_CasC-035K-156_03-02-02_Pulpp-10340-20679,Inm24,Gdl,Santa Rita,Ren,CasC,156.0,3.0,2.0,35000.0,900.0,-103.403538,20.679374,0.0,2.5,25.0,224.3589743589744,

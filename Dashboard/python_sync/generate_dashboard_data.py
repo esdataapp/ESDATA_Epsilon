@@ -63,25 +63,42 @@ class DashboardDataGenerator:
         """Mapear las columnas a nombres estándar para el dashboard"""
         print("🗂️ Mapeando columnas...")
         
+        # Manejar columnas duplicadas del merge
+        # Preferir columnas _x (del archivo numérico) sobre _y (amenidades)
+        for col_base in ['PaginaWeb', 'Ciudad', 'Colonia', 'operacion', 'tipo_propiedad', 
+                         'area_m2', 'precio', 'mantenimiento', 'PxM2']:
+            col_x = f"{col_base}_x"
+            col_y = f"{col_base}_y"
+            
+            if col_x in self.df.columns:
+                # Usar la columna _x y eliminar _y si existe
+                self.df[col_base] = self.df[col_x]
+                self.df = self.df.drop(columns=[col_x])
+                if col_y in self.df.columns:
+                    self.df = self.df.drop(columns=[col_y])
+            elif col_y in self.df.columns:
+                # Solo existe _y, usarla
+                self.df[col_base] = self.df[col_y]
+                self.df = self.df.drop(columns=[col_y])
+        
         # Mapeo según las columnas reales del archivo Final_Num_Sep25.csv
         column_mapping = {
             'id': 'id_propiedad',
             'PaginaWeb': 'pagina_web',
-            'Ciudad': 'ciudad',  # Pero esta parece ser colonia en realidad
+            'Ciudad': 'municipio',  # Esta es realmente el municipio (Zap, Gdl)
+            'Colonia': 'colonia',   # Esta es la colonia real
             'operacion': 'operacion',
             'tipo_propiedad': 'tipo_propiedad',
             'area_m2': 'superficie_m2',
             'recamaras': 'recamaras',
             'estacionamientos': 'estacionamientos',
-            'Banos': 'banos',
             'precio': 'precio',
             'mantenimiento': 'mantenimiento',
-            'Colonia': 'colonia_oficial',  # Esta parece estar vacía
             'longitud': 'longitud',
             'latitud': 'latitud',
             'tiempo_publicacion': 'dias_publicacion',
             'Banos_totales': 'banos_totales',
-            'antigüedad_icon': 'antiguedad_anos',
+            'antiguedad_icon': 'antiguedad_anos',
             'PxM2': 'precio_por_m2'
         }
         
@@ -89,21 +106,53 @@ class DashboardDataGenerator:
         columns_to_rename = {k: v for k, v in column_mapping.items() if k in self.df.columns}
         self.df = self.df.rename(columns=columns_to_rename)
         
-        # Ajuste especial: parece que 'Ciudad' contiene la colonia real
-        if 'ciudad' in self.df.columns and 'colonia_oficial' in self.df.columns:
-            # Usar 'Ciudad' como colonia si colonia_oficial está vacía
-            self.df['colonia'] = self.df['ciudad']
-            # Y necesitamos determinar la ciudad real desde el ID o algún otro campo
-            self.df['ciudad_real'] = self.df['id_propiedad'].str.split('-').str[0].map({
-                'Gdl': 'Guadalajara',
-                'Zap': 'Zapopan'
-            })
+        # Expandir municipios abreviados
+        municipio_mapping = {
+            'Zap': 'Zapopan',
+            'Gdl': 'Guadalajara',
+            'Tlaq': 'Tlaquepaque',
+            'Ton': 'Tonalá'
+        }
+        
+        if 'municipio' in self.df.columns:
+            self.df['municipio'] = self.df['municipio'].map(municipio_mapping).fillna(self.df['municipio'])
+        
+        # Expandir operaciones abreviadas
+        operacion_mapping = {
+            'Ren': 'renta',
+            'Ven': 'venta'
+        }
+        
+        if 'operacion' in self.df.columns:
+            self.df['operacion'] = self.df['operacion'].map(operacion_mapping).fillna(self.df['operacion'])
+        
+        # Expandir tipos de propiedad abreviados
+        tipo_mapping = {
+            'Cas': 'Casa',
+            'CasC': 'Casa en Condominio',
+            'Dep': 'Departamento',
+            'Ofc': 'Oficina',
+            'LocC': 'Local Comercial',
+            'Terr': 'Terreno'
+        }
+        
+        if 'tipo_propiedad' in self.df.columns:
+            self.df['tipo_propiedad'] = self.df['tipo_propiedad'].map(tipo_mapping).fillna(self.df['tipo_propiedad'])
         
         # Crear columna fecha_scrape para análisis temporales (asumir fecha actual para ahora)
         if 'fecha_scrape' not in self.df.columns:
             self.df['fecha_scrape'] = pd.Timestamp.now()
         
         print(f"✅ Columnas mapeadas. Shape final: {self.df.shape}")
+        print(f"   Columnas principales: {[col for col in ['operacion', 'tipo_propiedad', 'municipio', 'colonia'] if col in self.df.columns]}")
+        
+        # Debug: mostrar algunos valores únicos
+        if 'municipio' in self.df.columns:
+            print(f"   Municipios únicos: {sorted(self.df['municipio'].unique())}")
+        if 'operacion' in self.df.columns:
+            print(f"   Operaciones únicas: {sorted(self.df['operacion'].unique())}")
+        if 'tipo_propiedad' in self.df.columns:
+            print(f"   Tipos únicos: {sorted(self.df['tipo_propiedad'].unique())}")
     
     def preparar_datos(self):
         """Limpiar y preparar los datos para análisis"""
@@ -113,57 +162,63 @@ class DashboardDataGenerator:
         if 'fecha_scrape' in self.df.columns:
             self.df['fecha_scrape'] = pd.to_datetime(self.df['fecha_scrape'], errors='coerce')
         
+        # Convertir tipos de datos numéricos
+        numeric_cols = ['precio', 'superficie_m2', 'precio_por_m2', 'recamaras', 'banos_totales', 'estacionamientos', 'antiguedad_anos']
+        for col in numeric_cols:
+            if col in self.df.columns:
+                self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+        
+        print(f"   Registros iniciales: {len(self.df):,}")
+        
         # Limpiar valores nulos en columnas críticas
         if 'precio' in self.df.columns:
+            before_price = len(self.df)
             self.df = self.df.dropna(subset=['precio'])
             # Eliminar precios = 0 o negativos
             self.df = self.df[self.df['precio'] > 0]
+            print(f"   Después de filtrar precios válidos: {len(self.df):,} (eliminados: {before_price - len(self.df):,})")
         
         # Limpiar superficie
         if 'superficie_m2' in self.df.columns:
+            before_area = len(self.df)
             self.df = self.df[self.df['superficie_m2'] > 0]
+            print(f"   Después de filtrar área válida: {len(self.df):,} (eliminados: {before_area - len(self.df):,})")
         
-        # Calcular precio por m² si no existe o verificar consistencia
+        # Verificar y recalcular precio por m² si es necesario
         if 'precio_por_m2' in self.df.columns and 'superficie_m2' in self.df.columns and 'precio' in self.df.columns:
-            # Verificar consistencia y recalcular si es necesario
-            calculated_pxm2 = self.df['precio'] / self.df['superficie_m2']
-            self.df['precio_por_m2'] = calculated_pxm2
+            # Recalcular precio por m² para asegurar consistencia
+            mask = (self.df['superficie_m2'] > 0) & (self.df['precio'] > 0)
+            self.df.loc[mask, 'precio_por_m2'] = self.df.loc[mask, 'precio'] / self.df.loc[mask, 'superficie_m2']
         
-        # Detectar y eliminar outliers extremos (usando IQR)
-        for col in ['precio', 'superficie_m2', 'precio_por_m2']:
+        # Detectar y eliminar outliers extremos (usando percentiles más conservadores)
+        outlier_params = {
+            'precio': (0.01, 0.99),
+            'superficie_m2': (0.01, 0.99),
+            'precio_por_m2': (0.01, 0.99)
+        }
+        
+        for col, (lower_p, upper_p) in outlier_params.items():
             if col in self.df.columns:
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - 3 * IQR  # 3 IQR para ser menos restrictivo
-                upper_bound = Q3 + 3 * IQR
+                lower_bound = self.df[col].quantile(lower_p)
+                upper_bound = self.df[col].quantile(upper_p)
                 
                 original_count = len(self.df)
                 self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
                 removed_count = original_count - len(self.df)
                 if removed_count > 0:
-                    print(f"   Eliminados {removed_count} outliers extremos en {col}")
-        
-        # Convertir tipos de datos
-        numeric_cols = ['precio', 'superficie_m2', 'precio_por_m2', 'recamaras', 'banos', 'estacionamientos']
-        for col in numeric_cols:
-            if col in self.df.columns:
-                self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+                    print(f"   Eliminados {removed_count:,} outliers extremos en {col}")
         
         print(f"✅ Datos preparados: {len(self.df):,} propiedades válidas")
         
-        # Calcular precio por m² si no existe
-        if 'precio_por_m2' not in self.df.columns and 'superficie_m2' in self.df.columns:
-            self.df['precio_por_m2'] = self.df['precio'] / self.df['superficie_m2']
-        
-        # Identificar outliers simples
+        # Identificar outliers moderados (para análisis, no eliminación)
         if 'is_outlier' not in self.df.columns:
             self.df['is_outlier'] = self.identificar_outliers()
         
-        # Filtrar outliers para cálculos principales
+        # Filtrar outliers para cálculos principales (usar todos los datos por ahora)
         self.df_clean = self.df[~self.df['is_outlier']].copy()
         
-        print(f"🎯 Datos limpios: {len(self.df_clean):,} propiedades")
+        print(f"🎯 Datos sin outliers: {len(self.df_clean):,} propiedades")
+        print(f"📊 Tasa de outliers: {(len(self.df) - len(self.df_clean)) / len(self.df) * 100:.1f}%")
     
     def identificar_outliers(self):
         """Identificar outliers usando IQR"""
@@ -277,21 +332,40 @@ class DashboardDataGenerator:
             print(f"  ⚠️ No hay datos de colonia disponibles para {operacion}")
             return
         
-        top_colonias = df.groupby(['colonia', 'municipio']).agg({
-            'precio': ['count', 'mean', 'median'],
-            'precio_por_m2': ['mean', 'median'] if 'precio_por_m2' in df.columns else ['count']
-        }).round(2)
+        # Agrupar por colonia y municipio
+        agrupacion_cols = ['colonia']
+        if 'municipio' in df.columns:
+            agrupacion_cols.append('municipio')
         
-        # Aplanar columnas
-        top_colonias.columns = ['_'.join(col).strip() for col in top_colonias.columns]
+        # Usar agg con funciones estándar
+        agrupaciones = []
+        
+        # Estadísticas de precio
+        precio_stats = df.groupby(agrupacion_cols)['precio'].agg(['count', 'mean', 'median']).round(2)
+        precio_stats.columns = ['precio_count', 'precio_mean', 'precio_median']
+        agrupaciones.append(precio_stats)
+        
+        # Estadísticas de precio por m² si existe
+        if 'precio_por_m2' in df.columns:
+            pxm2_stats = df.groupby(agrupacion_cols)['precio_por_m2'].agg(['mean', 'median']).round(2)
+            pxm2_stats.columns = ['precio_por_m2_mean', 'precio_por_m2_median']
+            agrupaciones.append(pxm2_stats)
+        
+        # Combinar todas las estadísticas
+        top_colonias = agrupaciones[0]
+        for stats in agrupaciones[1:]:
+            top_colonias = top_colonias.join(stats)
+        
         top_colonias = top_colonias.reset_index()
         
-        # Filtrar colonias con al menos 5 propiedades
-        top_colonias = top_colonias[top_colonias['precio_count'] >= 5]
+        # Filtrar colonias con al menos 3 propiedades
+        top_colonias = top_colonias[top_colonias['precio_count'] >= 3]
         
-        # Ordenar por precio por m² promedio
+        # Ordenar por precio por m² promedio si existe
         if 'precio_por_m2_mean' in top_colonias.columns:
             top_colonias = top_colonias.sort_values('precio_por_m2_mean', ascending=False)
+        else:
+            top_colonias = top_colonias.sort_values('precio_mean', ascending=False)
         
         top_colonias = top_colonias.head(50)
         
@@ -305,14 +379,14 @@ class DashboardDataGenerator:
             df = self.df_clean
             
         if 'tipo_propiedad' not in df.columns:
+            print(f"  ⚠️ No hay datos de tipo de propiedad para {operacion}")
             return
         
-        distribucion = df.groupby('tipo_propiedad').agg({
-            'precio': ['count', 'mean', 'median']
-        }).round(2)
+        # Estadísticas por tipo de propiedad
+        precio_stats = df.groupby('tipo_propiedad')['precio'].agg(['count', 'mean', 'median']).round(2)
+        precio_stats.columns = ['precio_count', 'precio_mean', 'precio_median']
         
-        distribucion.columns = ['_'.join(col).strip() for col in distribucion.columns]
-        distribucion = distribucion.reset_index()
+        distribucion = precio_stats.reset_index()
         
         # Calcular porcentajes
         total = distribucion['precio_count'].sum()
@@ -381,11 +455,15 @@ class DashboardDataGenerator:
         segmentos = {
             'starter_1r_1b': {
                 'nombre': 'Starter (1R + 1-1.5B)',
-                'filtros': {'recamaras': [1], 'banos': [1, 1.5]}
+                'filtros': {'recamaras': [1], 'banos_totales': [1, 1.5]}
             },
             'family_2r_2b': {
                 'nombre': 'Familiar (2R + 2-2.5B)', 
-                'filtros': {'recamaras': [2], 'banos': [2, 2.5]}
+                'filtros': {'recamaras': [2], 'banos_totales': [2, 2.5]}
+            },
+            'premium_3r_3b': {
+                'nombre': 'Premium (3R + 3-3.5B)',
+                'filtros': {'recamaras': [3], 'banos_totales': [3, 3.5]}
             }
         }
         
@@ -408,6 +486,8 @@ class DashboardDataGenerator:
                 index=False
             )
             print(f"  ✅ Segmentos {operacion}: {len(segmentos_df)} segmentos")
+        else:
+            print(f"  ⚠️ No se generaron segmentos para {operacion}")
     
     def _aplicar_filtros_segmento(self, df, filtros):
         """Aplicar filtros de segmentación"""
@@ -441,18 +521,20 @@ class DashboardDataGenerator:
             df = self.df_clean
         
         variables_numericas = []
-        candidatas = ['precio', 'superficie_m2', 'precio_por_m2', 'recamaras', 'banos']
+        candidatas = ['precio', 'superficie_m2', 'precio_por_m2', 'recamaras', 'banos_totales', 'estacionamientos']
         
         for var in candidatas:
             if var in df.columns:
                 variables_numericas.append(var)
         
         if len(variables_numericas) < 2:
+            print(f"  ⚠️ No hay suficientes variables numéricas para correlaciones en {operacion}")
             return
         
         df_corr = df[variables_numericas].dropna()
         
         if len(df_corr) < 10:
+            print(f"  ⚠️ No hay suficientes datos para correlaciones en {operacion}")
             return
         
         corr_pearson = df_corr.corr(method='pearson')
@@ -521,13 +603,26 @@ class DashboardDataGenerator:
             df = self.df_clean
         
         if 'colonia' not in df.columns:
+            print(f"  ⚠️ No hay datos de colonia para {operacion}")
             return
         
-        mapa_data = df.groupby(['colonia', 'municipio']).agg({
-            'precio': ['count', 'median']
-        }).reset_index()
+        # Agrupar por colonia (y municipio si existe)
+        agrupacion_cols = ['colonia']
+        if 'municipio' in df.columns:
+            agrupacion_cols.append('municipio')
         
-        mapa_data.columns = ['colonia', 'municipio', 'count', 'precio_mediano']
+        # Estadísticas para el mapa
+        mapa_stats = df.groupby(agrupacion_cols).agg({
+            'precio': ['count', 'median'],
+            'longitud': 'mean',
+            'latitud': 'mean'
+        }).round(6)
+        
+        # Aplanar columnas
+        mapa_stats.columns = ['count', 'precio_mediano', 'longitud_centro', 'latitud_centro']
+        mapa_data = mapa_stats.reset_index()
+        
+        # Filtrar colonias con al menos 3 propiedades
         mapa_data = mapa_data[mapa_data['count'] >= 3]
         
         filename = f'mapa_calor_colonias_{operacion}.csv'

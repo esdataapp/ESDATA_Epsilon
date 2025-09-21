@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary-500 hover:bg-secondary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-sm border p-6;
+  }
+  
+  .card-header {
+    @apply flex items-center justify-between mb-4;
+  }
+  
+  .card-title {
+    @apply text-lg font-semibold text-gray-900;
+  }
+}

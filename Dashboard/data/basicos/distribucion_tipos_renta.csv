@@ -1,0 +1,4 @@
+tipo_propiedad,precio_count,precio_mean,precio_median,percentage
+Casa,146,45809.59,37950.0,12.6
+Casa en Condominio,75,47860.8,30000.0,6.5
+Departamento,934,26573.93,24700.0,80.9

@@ -1,0 +1,3 @@
+﻿Periodo,Ciudad,Operacion,Tipo,Colonia,n,precio_representativo,precio_min,precio_max,precio_skew,precio_metodo,area_m2_representativo,area_m2_min,area_m2_max,area_m2_skew,area_m2_metodo,PxM2_representativo,PxM2_min,PxM2_max,PxM2_skew,PxM2_metodo
+Sep25,Zap,Ren,CasC,Puerta Las Lomas,7,130000.0,110000.0,150000.0,0.27872900262208666,mediana_rango,502.0,453.0,600.0,0.9238301611881529,mediana_rango,260.8695652173913,236.3636363636364,268.9243027888446,-0.5456879456079562,mediana_rango
+Sep25,Zap,Ren,CasC,Valle Imperial,6,22000.0,13500.0,25000.0,-1.685615032678744,mediana_rango,177.5,99.0,210.0,-0.7236879408519546,mediana_rango,119.52380952380952,111.9047619047619,176.92307692307693,1.9011535556502326,mediana_rango

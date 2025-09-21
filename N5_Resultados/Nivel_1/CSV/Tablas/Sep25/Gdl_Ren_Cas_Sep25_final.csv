@@ -1,0 +1,2 @@
+﻿Periodo,Ciudad,Operacion,Tipo,Colonia,n,precio_representativo,precio_min,precio_max,precio_skew,precio_metodo,area_m2_representativo,area_m2_min,area_m2_max,area_m2_skew,area_m2_metodo,PxM2_representativo,PxM2_min,PxM2_max,PxM2_skew,PxM2_metodo
+Sep25,Gdl,Ren,Cas,Country Club,5,100000.0,70000.0,132000.0,0.040340600541530304,mediana_rango,550.0,307.0,600.0,-1.2243880024989933,mediana_rango,222.22222222222223,116.66666666666669,240.0,-2.0822886273971846,mediana_rango
