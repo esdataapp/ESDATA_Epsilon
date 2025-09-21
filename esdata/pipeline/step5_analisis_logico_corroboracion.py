@@ -27,12 +27,21 @@ log = get_logger('step5')
 NUM_KEEP_COLS = [
     "id","PaginaWeb","Ciudad","Fecha_Scrap","tipo_propiedad","area_m2","recamaras","estacionamientos",
     "operacion","precio","mantenimiento","Colonia","longitud","latitud","tiempo_publicacion","Banos_totales",
-    "antiguedad_icon","PxM2"
+    "antiguedad_icon","PxM2","outlier_justificado_por_antiguedad"
 ]
 
-# Condiciones específicas por tipo de propiedad y operación (ACTUALIZADAS)
+# Constantes para superficie teórica (solo departamentos)
+SUPERFICIE_TEORICA = {
+    'recamara': 9.45,      # m²
+    'bano_completo': 3.96,  # m²
+    'medio_bano': 1.5,      # m²
+    'cocina': 7.5,          # m²
+    'sala_estancia': 15.75  # m²
+}
+
+# Condiciones específicas por tipo de propiedad y operación (ACTUALIZADAS SEGÚN DIRECTRICES)
 PROPERTY_CONDITIONS = {
-    # Departamentos en Venta (LÍMITES OPTIMIZADOS)
+    # Departamentos en Venta (LÍMITES OPTIMIZADOS SEGÚN DIRECTRICES)
     ('departamento', 'venta'): {
         'area_min': 30, 'area_max': 200,
         'precio_min': 500000, 'precio_max': 25000000,
@@ -40,7 +49,7 @@ PROPERTY_CONDITIONS = {
         'recamaras_min': 1, 'recamaras_max': 3,
         'banos_min': 1, 'banos_max': 4.5
     },
-    # Casas en Venta (LÍMITES OPTIMIZADOS)
+    # Casas en Venta (LÍMITES OPTIMIZADOS SEGÚN DIRECTRICES)
     ('casa', 'venta'): {
         'area_min': 30, 'area_max': 1000,
         'precio_min': 500000, 'precio_max': 45000000,
@@ -177,134 +186,260 @@ def _compute_pxm2(df: pd.DataFrame):
     df.loc[mask,'PxM2']= df.loc[mask,'precio']/df.loc[mask,'area_m2']
     return df
 
-def _apply_logical_rules(df: pd.DataFrame):
-    """Aplica reglas lógicas para corregir variables y detectar outliers"""
-    corrected_rows = 0
+def _imputation_and_correction(df: pd.DataFrame):
+    """
+    1. IMPUTACIÓN Y CORRECCIÓN INICIAL
+    Intenta corregir valores nulos o atípicos antes de eliminar registros.
+    Prioridad: Salvar la mayor cantidad de registros posibles.
+    """
+    corrected_records = 0
+    imputed_records = 0
     corrections_log = []
     
-    # Crear copias para las modificaciones
+    log.info("🔧 Iniciando imputación y corrección inicial...")
+    
     df_corrected = df.copy()
     
     for idx, row in df.iterrows():
         changes = []
-        
-        # 1. Regla de Baños: baños <= recámaras + 1.5
-        recamaras = row.get('recamaras')
-        banos = row.get('Banos_totales')
-        
-        if pd.notna(recamaras) and pd.notna(banos) and recamaras > 0:
-            max_banos_logico = recamaras + 1.5
-            if banos > max_banos_logico:
-                # Intentar corregir si la diferencia es razonable (puede ser error de dígito)
-                if banos <= 10 and recamaras <= 5:  # Solo para casos no extremos
-                    # Posible corrección: quitar un dígito (ej: 35 -> 3.5)
-                    if banos >= 10 and banos % 10 == 5:
-                        nuevo_banos = banos / 10
-                        if nuevo_banos <= max_banos_logico:
-                            df_corrected.loc[df_corrected.index == idx, 'Banos_totales'] = nuevo_banos
-                            changes.append(f'banos_{banos}_a_{nuevo_banos}')
-                    # O dividir entre 10 si es muy grande
-                    elif banos >= 10:
-                        nuevo_banos = banos / 10
-                        if nuevo_banos <= max_banos_logico and nuevo_banos >= 1:
-                            df_corrected.loc[df_corrected.index == idx, 'Banos_totales'] = nuevo_banos
-                            changes.append(f'banos_{banos}_a_{nuevo_banos}')
-        
-        # 2. Regla de Estacionamientos: estacionamientos <= recámaras + 1
-        estacionamientos = row.get('estacionamientos')
-        
-        if pd.notna(recamaras) and pd.notna(estacionamientos) and recamaras > 0:
-            max_estacionamientos_logico = recamaras + 1
-            if estacionamientos > max_estacionamientos_logico:
-                # Intentar corregir si la diferencia es razonable
-                if estacionamientos <= 10 and recamaras <= 5:  # Solo para casos no extremos
-                    # Posible corrección: dividir entre 10 si es muy grande
-                    if estacionamientos >= 10:
-                        nuevo_estacionamientos = estacionamientos / 10
-                        if nuevo_estacionamientos <= max_estacionamientos_logico and nuevo_estacionamientos >= 0:
-                            df_corrected.loc[df_corrected.index == idx, 'estacionamientos'] = nuevo_estacionamientos
-                            changes.append(f'estacionamientos_{estacionamientos}_a_{nuevo_estacionamientos}')
-        
-        # 3. Corrección de recámaras vacías basada en área (estimación básica)
+        original_recamaras = row.get('recamaras')
+        original_banos = row.get('Banos_totales')
+        original_estacionamientos = row.get('estacionamientos')
         area = row.get('area_m2')
-        if pd.isna(recamaras) or recamaras <= 0:
+        
+        # IMPUTACIÓN DE RECÁMARAS basada en área
+        if pd.isna(original_recamaras) or original_recamaras <= 0:
             if pd.notna(area) and area > 0:
-                # Estimación básica: 1 recámara por cada 45 m², mínimo 1
-                recamaras_estimadas = max(1, round(area / 45))
-                if recamaras_estimadas <= 4:  # Solo hasta 4 recámaras
-                    df_corrected.loc[df_corrected.index == idx, 'recamaras'] = recamaras_estimadas
-                    changes.append(f'recamaras_estimadas_{recamaras_estimadas}')
+                # Estimación: 1 recámara por cada 45 m², mínimo 1, máximo 4
+                recamaras_estimadas = max(1, min(4, round(area / 45)))
+                df_corrected.loc[df_corrected.index == idx, 'recamaras'] = recamaras_estimadas
+                changes.append(f'recamaras_imputadas_{recamaras_estimadas}')
+                imputed_records += 1
+        
+        # IMPUTACIÓN DE BAÑOS basada en recámaras
+        recamaras_actual = df_corrected.loc[df_corrected.index == idx, 'recamaras'].iloc[0]
+        if pd.isna(original_banos) or original_banos <= 0:
+            if pd.notna(recamaras_actual) and recamaras_actual > 0:
+                # Estimación: 1 baño por recámara como mínimo, máximo 1.5 * recámaras
+                banos_estimados = min(recamaras_actual * 1.5, recamaras_actual + 1)
+                df_corrected.loc[df_corrected.index == idx, 'Banos_totales'] = banos_estimados
+                changes.append(f'banos_imputados_{banos_estimados}')
+                imputed_records += 1
+        
+        # IMPUTACIÓN DE ESTACIONAMIENTOS basada en recámaras
+        if pd.isna(original_estacionamientos) or original_estacionamientos < 0:
+            if pd.notna(recamaras_actual) and recamaras_actual > 0:
+                # Estimación: 1 estacionamiento por recámara, máximo recámaras + 1
+                estacionamientos_estimados = min(recamaras_actual, recamaras_actual + 1)
+                df_corrected.loc[df_corrected.index == idx, 'estacionamientos'] = estacionamientos_estimados
+                changes.append(f'estacionamientos_imputados_{estacionamientos_estimados}')
+                imputed_records += 1
+        
+        # CORRECCIÓN DE VALORES ATÍPICOS POR ERRORES DE DIGITACIÓN
+        banos_actual = df_corrected.loc[df_corrected.index == idx, 'Banos_totales'].iloc[0]
+        estacionamientos_actual = df_corrected.loc[df_corrected.index == idx, 'estacionamientos'].iloc[0]
+        
+        # Corrección de baños (posibles errores como 25 en lugar de 2.5)
+        if pd.notna(banos_actual) and banos_actual >= 10:
+            if banos_actual % 10 == 5:  # Caso: 25 -> 2.5
+                nuevo_banos = banos_actual / 10
+                df_corrected.loc[df_corrected.index == idx, 'Banos_totales'] = nuevo_banos
+                changes.append(f'banos_corregidos_{banos_actual}_a_{nuevo_banos}')
+                corrected_records += 1
+            elif banos_actual % 10 == 0:  # Caso: 20 -> 2.0
+                nuevo_banos = banos_actual / 10
+                df_corrected.loc[df_corrected.index == idx, 'Banos_totales'] = nuevo_banos
+                changes.append(f'banos_corregidos_{banos_actual}_a_{nuevo_banos}')
+                corrected_records += 1
+        
+        # Corrección de estacionamientos (posibles errores como 30 en lugar de 3)
+        if pd.notna(estacionamientos_actual) and estacionamientos_actual >= 10:
+            nuevo_estacionamientos = estacionamientos_actual / 10
+            if nuevo_estacionamientos <= 6:  # Máximo razonable
+                df_corrected.loc[df_corrected.index == idx, 'estacionamientos'] = nuevo_estacionamientos
+                changes.append(f'estacionamientos_corregidos_{estacionamientos_actual}_a_{nuevo_estacionamientos}')
+                corrected_records += 1
         
         if changes:
-            corrected_rows += 1
             corrections_log.append(f"ID {row.get('id', 'unknown')}: {', '.join(changes)}")
     
-    print(f"🔧 Correcciones aplicadas a {corrected_rows} propiedades")
-    if corrected_rows > 0 and len(corrections_log) <= 10:
-        print("📝 Ejemplos de correcciones:")
-        for log in corrections_log[:5]:
-            print(f"   • {log}")
+    log.info(f"✅ Imputación completada:")
+    log.info(f"   � Registros con imputaciones: {imputed_records}")
+    log.info(f"   🔧 Registros con correcciones: {corrected_records}")
+    
+    if corrections_log and len(corrections_log) <= 20:
+        log.info("📝 Ejemplos de correcciones aplicadas:")
+        for example in corrections_log[:10]:
+            log.info(f"   • {example}")
     
     return df_corrected
 
-def _calculate_physical_coherence(df: pd.DataFrame):
-    """Calcula coherencia física usando medidas promedio para departamentos"""
-    # Medidas promedio para departamentos
-    MEDIDAS_PROMEDIO = {
-        'recamara': 9.45,      # m²
-        'bano_completo': 3.96,  # m²
-        'medio_bano': 1.5,      # m²
-        'cocina': 7.5,          # m²
-        'sala_estancia': 15.75, # m²
-        'estacionamiento': 11.52 # m² (normalmente no cuenta en depto)
-    }
+def _validate_room_coherence(df: pd.DataFrame):
+    """
+    2. VALIDACIÓN DE COHERENCIA ENTRE HABITACIONES
+    Aplica las reglas para detectar outliers lógicos que deben ser eliminados.
+    """
+    log.info("🏠 Validando coherencia entre habitaciones...")
     
-    coherencia_scores = []
+    violations = []
+    for idx, row in df.iterrows():
+        row_violations = []
+        
+        recamaras = row.get('recamaras')
+        banos = row.get('Banos_totales')
+        estacionamientos = row.get('estacionamientos')
+        
+        # Regla de Baños: baños <= recámaras + 1.5
+        if pd.notna(recamaras) and pd.notna(banos) and recamaras > 0:
+            if banos > (recamaras + 1.5):
+                row_violations.append(f'banos_excesivos_{banos}_vs_rec_{recamaras}')
+        
+        # Regla de Estacionamientos: estacionamientos <= recámaras + 1
+        if pd.notna(recamaras) and pd.notna(estacionamientos) and recamaras > 0:
+            if estacionamientos > (recamaras + 1):
+                row_violations.append(f'estacionamientos_excesivos_{estacionamientos}_vs_rec_{recamaras}')
+        
+        if row_violations:
+            violations.append((idx, ';'.join(row_violations)))
+    
+    violation_indices = [v[0] for v in violations]
+    valid_df = df.drop(index=violation_indices)
+    invalid_df = df.loc[violation_indices].copy()
+    
+    if violations:
+        invalid_df['motivos_eliminacion'] = [v[1] for v in violations]
+    
+    log.info(f"   ✅ Registros válidos: {len(valid_df):,}")
+    log.info(f"   ❌ Registros eliminados por coherencia: {len(invalid_df):,}")
+    
+    return valid_df, invalid_df
+
+
+def _verify_surface_logic_departments(df: pd.DataFrame):
+    """
+    3. VERIFICACIÓN DE SUPERFICIE LÓGICA (Solo para Departamentos)
+    Implementa sanity check para validar coherencia entre superficie reportada y calculada.
+    """
+    log.info("📐 Verificando lógica de superficie para departamentos...")
+    
+    # Filtrar solo departamentos
+    departamentos = df[df['tipo_propiedad'].str.lower().str.contains('dep', na=False)].copy()
+    otros = df[~df['tipo_propiedad'].str.lower().str.contains('dep', na=False)].copy()
+    
+    if len(departamentos) == 0:
+        log.info("   ⚠️ No hay departamentos para verificar superficie")
+        return df, pd.DataFrame()
+    
+    violations = []
+    
+    for idx, row in departamentos.iterrows():
+        recamaras = row.get('recamaras', 0)
+        banos_totales = row.get('Banos_totales', 0)
+        area_reportada = row.get('area_m2', 0)
+        
+        if pd.notna(recamaras) and pd.notna(banos_totales) and pd.notna(area_reportada):
+            if recamaras > 0 and banos_totales > 0 and area_reportada > 0:
+                # Calcular superficie teórica
+                banos_completos = int(banos_totales)
+                medios_banos = 1 if (banos_totales % 1) >= 0.5 else 0
+                
+                superficie_teorica = (
+                    recamaras * SUPERFICIE_TEORICA['recamara'] +
+                    banos_completos * SUPERFICIE_TEORICA['bano_completo'] +
+                    medios_banos * SUPERFICIE_TEORICA['medio_bano'] +
+                    SUPERFICIE_TEORICA['cocina'] +
+                    SUPERFICIE_TEORICA['sala_estancia']
+                )
+                
+                # Validación: discrepancia extrema (factor de 5)
+                ratio = area_reportada / superficie_teorica if superficie_teorica > 0 else 0
+                
+                if ratio < 0.2 or ratio > 5.0:  # Discrepancia extrema
+                    violations.append((idx, f'superficie_incoherente_rep_{area_reportada}_teo_{superficie_teorica:.1f}_ratio_{ratio:.2f}'))
+    
+    violation_indices = [v[0] for v in violations]
+    valid_departamentos = departamentos.drop(index=violation_indices)
+    invalid_departamentos = departamentos.loc[violation_indices].copy()
+    
+    if violations:
+        invalid_departamentos['motivos_eliminacion'] = [v[1] for v in violations]
+    
+    # Combinar departamentos válidos con otros tipos de propiedad
+    valid_df = pd.concat([valid_departamentos, otros], ignore_index=True)
+    
+    log.info(f"   📊 Departamentos analizados: {len(departamentos):,}")
+    log.info(f"   ✅ Departamentos con superficie coherente: {len(valid_departamentos):,}")
+    log.info(f"   ❌ Departamentos eliminados por superficie: {len(invalid_departamentos):,}")
+    
+    return valid_df, invalid_departamentos
+
+
+def _apply_optimal_property_filters(df: pd.DataFrame):
+    """
+    4. FILTRO FINAL POR RANGOS DE PROPIEDAD ÓPTIMA
+    Aplica filtros específicos según las directrices para departamentos y casas.
+    """
+    log.info("🎯 Aplicando filtros de propiedad óptima...")
+    
+    violations = []
     
     for idx, row in df.iterrows():
+        row_violations = []
+        
         tipo_propiedad = _normalize_property_type(row.get('tipo_propiedad'))
+        operacion = _normalize_operation(row.get('operacion'))
         
-        # Solo aplicar a departamentos por ahora
-        if tipo_propiedad != 'departamento':
-            coherencia_scores.append(np.nan)
-            continue
+        area = row.get('area_m2')
+        precio = row.get('precio')
+        pxm2 = row.get('PxM2')
+        recamaras = row.get('recamaras')
+        banos = row.get('Banos_totales')
+        
+        # Aplicar filtros específicos para departamentos y casas
+        if tipo_propiedad in ['departamento', 'casa']:
+            key = (tipo_propiedad, operacion)
+            conditions = PROPERTY_CONDITIONS.get(key, {})
             
-        recamaras = row.get('recamaras', 0)
-        banos = row.get('Banos_totales', 0)
-        area_real = row.get('area_m2', 0)
+            if conditions:
+                # Validar superficie
+                if pd.notna(area) and ('area_min' in conditions and 'area_max' in conditions):
+                    if area < conditions['area_min'] or area > conditions['area_max']:
+                        row_violations.append(f'superficie_fuera_rango_{area}_{conditions["area_min"]}-{conditions["area_max"]}')
+                
+                # Validar precio
+                if pd.notna(precio) and ('precio_min' in conditions and 'precio_max' in conditions):
+                    if precio < conditions['precio_min'] or precio > conditions['precio_max']:
+                        row_violations.append(f'precio_fuera_rango_{precio}_{conditions["precio_min"]}-{conditions["precio_max"]}')
+                
+                # Validar PxM2
+                if pd.notna(pxm2) and ('pxm2_min' in conditions and 'pxm2_max' in conditions):
+                    if pxm2 < conditions['pxm2_min'] or pxm2 > conditions['pxm2_max']:
+                        row_violations.append(f'pxm2_fuera_rango_{pxm2}_{conditions["pxm2_min"]}-{conditions["pxm2_max"]}')
+                
+                # Validar recámaras
+                if pd.notna(recamaras) and ('recamaras_min' in conditions and 'recamaras_max' in conditions):
+                    if recamaras < conditions['recamaras_min'] or recamaras > conditions['recamaras_max']:
+                        row_violations.append(f'recamaras_fuera_rango_{recamaras}_{conditions["recamaras_min"]}-{conditions["recamaras_max"]}')
+                
+                # Validar baños
+                if pd.notna(banos) and ('banos_min' in conditions and 'banos_max' in conditions):
+                    if banos < conditions['banos_min'] or banos > conditions['banos_max']:
+                        row_violations.append(f'banos_fuera_rango_{banos}_{conditions["banos_min"]}-{conditions["banos_max"]}')
         
-        if pd.isna(recamaras) or pd.isna(banos) or pd.isna(area_real) or area_real <= 0:
-            coherencia_scores.append(np.nan)
-            continue
-        
-        # Calcular área esperada
-        area_esperada = 0
-        
-        # Recámaras
-        area_esperada += recamaras * MEDIDAS_PROMEDIO['recamara']
-        
-        # Baños (asumir que .5 = medio baño)
-        banos_completos = int(banos)
-        medios_banos = 1 if (banos % 1) >= 0.5 else 0
-        
-        area_esperada += banos_completos * MEDIDAS_PROMEDIO['bano_completo']
-        area_esperada += medios_banos * MEDIDAS_PROMEDIO['medio_bano']
-        
-        # Cocina (1)
-        area_esperada += MEDIDAS_PROMEDIO['cocina']
-        
-        # Sala/Estancia (1)
-        area_esperada += MEDIDAS_PROMEDIO['sala_estancia']
-        
-        # Calcular ratio de coherencia (área_real / área_esperada)
-        if area_esperada > 0:
-            coherencia = area_real / area_esperada
-            coherencia_scores.append(coherencia)
-        else:
-            coherencia_scores.append(np.nan)
+        if row_violations:
+            violations.append((idx, ';'.join(row_violations)))
     
-    df['coherencia_fisica'] = coherencia_scores
-    return df
+    violation_indices = [v[0] for v in violations]
+    valid_df = df.drop(index=violation_indices)
+    invalid_df = df.loc[violation_indices].copy()
+    
+    if violations:
+        invalid_df['motivos_eliminacion'] = [v[1] for v in violations]
+    
+    log.info(f"   ✅ Propiedades óptimas: {len(valid_df):,}")
+    log.info(f"   ❌ Propiedades eliminadas por filtros: {len(invalid_df):,}")
+    
+    return valid_df, invalid_df
 
 def _repair_antiguedad(df: pd.DataFrame):
     """Repara valores de antigüedad_icon que sean demasiado altos"""
@@ -514,11 +649,8 @@ def run(periodo):
     log.info('🧮 Calculando precio por metro cuadrado...')
     improved = _compute_pxm2(improved)
     
-    log.info('🔧 Aplicando reglas lógicas de corrección...')
-    improved = _apply_logical_rules(improved)
-    
-    log.info('🏗️ Calculando coherencia física...')
-    improved = _calculate_physical_coherence(improved)
+    log.info('🔧 Aplicando validación comprehensiva...')
+    improved, eliminated_records = _apply_comprehensive_validation(improved)
     
     log.info('⏳ Reparando valores de antigüedad...')
     improved = _repair_antiguedad(improved)
@@ -593,6 +725,139 @@ def run(periodo):
     log.info('=' * 80)
     
     return output_path
+
+def _correct_age_anomalies(df: pd.DataFrame):
+    """
+    5. CORRECCIÓN DE ANTIGÜEDAD ANÓMALA (NO ELIMINATORIA)
+    Corrige valores obvios de error de captura pero mantiene todas las propiedades.
+    """
+    log.info("📅 Corrigiendo anomalías obvias de antigüedad...")
+    
+    if 'antiguedad_icon' not in df.columns:
+        log.warning("   ⚠️ Columna 'antiguedad_icon' no encontrada")
+        return df
+    
+    corrections_made = 0
+    
+    # Usar máscaras para corregir errores obvios de captura
+    mask_year_error = df['antiguedad_icon'] > 200
+    if mask_year_error.sum() > 0:
+        df.loc[mask_year_error, 'antiguedad_icon'] = 2025 - df.loc[mask_year_error, 'antiguedad_icon']
+        corrections_made += mask_year_error.sum()
+    
+    # Posible confusión meses/años (110-200 años)
+    mask_months = (df['antiguedad_icon'] > 110) & (df['antiguedad_icon'] <= 200)
+    if mask_months.sum() > 0:
+        df.loc[mask_months, 'antiguedad_icon'] = df.loc[mask_months, 'antiguedad_icon'] / 12
+        corrections_made += mask_months.sum()
+    
+    # Posible error de entrada (25-110 años)
+    mask_decimal = (df['antiguedad_icon'] > 25) & (df['antiguedad_icon'] <= 110)
+    if mask_decimal.sum() > 0:
+        df.loc[mask_decimal, 'antiguedad_icon'] = df.loc[mask_decimal, 'antiguedad_icon'] / 10
+        corrections_made += mask_decimal.sum()
+    
+    if corrections_made > 0:
+        log.info(f"   🔧 Correcciones aplicadas: {corrections_made:,} registros")
+    else:
+        log.info("   ✅ No se encontraron anomalías obvias de antigüedad")
+    
+    return df
+
+
+def _analyze_age_context_for_outliers(df: pd.DataFrame):
+    """
+    6. ANÁLISIS CONTEXTUAL DE ANTIGÜEDAD PARA OUTLIERS
+    Usa la antigüedad como factor contextual para entender outliers de precio/superficie.
+    NO elimina propiedades, solo marca outliers justificados por antigüedad.
+    """
+    log.info("🏛️ Analizando contexto de antigüedad para outliers...")
+    
+    if 'antiguedad_icon' not in df.columns:
+        log.warning("   ⚠️ Columna 'antiguedad_icon' no encontrada")
+        df['outlier_justificado_por_antiguedad'] = False
+        return df
+    
+    # Inicializar columna
+    df['outlier_justificado_por_antiguedad'] = False
+    
+    # Identificar outliers justificados por antigüedad
+    mask_muy_antigua = df['antiguedad_icon'] > 50
+    mask_precio_bajo = df['PxM2'] < 8000
+    mask_superficie_atipica = (df['area_m2'] > 500) | (df['area_m2'] < 25)
+    
+    # Propiedades muy antiguas con precio bajo
+    mask_justificado_1 = mask_muy_antigua & mask_precio_bajo
+    
+    # Propiedades muy antiguas con superficie atípica
+    mask_justificado_2 = mask_muy_antigua & mask_superficie_atipica
+    
+    # Propiedades antiguas (20-50 años) con descuento moderado
+    mask_antigua = (df['antiguedad_icon'] > 20) & (df['antiguedad_icon'] <= 50)
+    mask_descuento = df['PxM2'] < 10000
+    mask_justificado_3 = mask_antigua & mask_descuento
+    
+    # Aplicar todas las justificaciones
+    mask_total_justificado = mask_justificado_1 | mask_justificado_2 | mask_justificado_3
+    df.loc[mask_total_justificado, 'outlier_justificado_por_antiguedad'] = True
+    
+    justificados = mask_total_justificado.sum()
+    
+    log.info(f"   ✅ Outliers justificados por antigüedad: {justificados:,}")
+    log.info(f"   📊 Propiedades analizadas con antigüedad: {df['antiguedad_icon'].notna().sum():,}")
+    
+    return df
+
+
+def _apply_comprehensive_validation(df: pd.DataFrame):
+    """
+    PIPELINE COMPLETO DE VALIDACIÓN
+    Implementa las 6 directrices de mejora en orden secuencial.
+    """
+    log.info("🔍 Iniciando validación comprehensiva...")
+    
+    initial_count = len(df)
+    all_eliminated = []
+    
+    # 1. Imputación y corrección inicial
+    df = _imputation_and_correction(df)
+    log.info(f"   Después de imputación: {len(df):,} registros")
+    
+    # 2. Validación de coherencia entre habitaciones
+    df, eliminated_coherence = _validate_room_coherence(df)
+    if len(eliminated_coherence) > 0:
+        all_eliminated.append(eliminated_coherence)
+    
+    # 3. Verificación de superficie lógica (departamentos)
+    df, eliminated_surface = _verify_surface_logic_departments(df)
+    if len(eliminated_surface) > 0:
+        all_eliminated.append(eliminated_surface)
+    
+    # 4. Filtros de propiedad óptima
+    df, eliminated_filters = _apply_optimal_property_filters(df)
+    if len(eliminated_filters) > 0:
+        all_eliminated.append(eliminated_filters)
+    
+    # 5. Corrección de antigüedad anómala (no eliminatoria)
+    df = _correct_age_anomalies(df)
+    
+    # 6. Análisis contextual de antigüedad para outliers (no eliminatoria)
+    df = _analyze_age_context_for_outliers(df)
+    
+    # Consolidar todos los eliminados (sin incluir antigüedad)
+    final_eliminated = pd.concat(all_eliminated, ignore_index=True) if all_eliminated else pd.DataFrame()
+    
+    final_count = len(df)
+    eliminated_count = initial_count - final_count
+    
+    log.info(f"🎯 RESUMEN VALIDACIÓN COMPREHENSIVA:")
+    log.info(f"   📊 Registros iniciales: {initial_count:,}")
+    log.info(f"   ✅ Registros válidos finales: {final_count:,}")
+    log.info(f"   ❌ Registros eliminados total: {eliminated_count:,}")
+    log.info(f"   📈 Tasa de retención: {(final_count/initial_count)*100:.1f}%")
+    
+    return df, final_eliminated
+
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Paso 5 Analisis Logico con Condiciones Específicas por Tipo de Propiedad')

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useOverview, useHistogram } from '@/hooks/useStatsAPI';
 import { useOperationStore } from '@/store/operationStore';
-import AdvancedFilters from '@/components/filters/AdvancedFilters';
+import CompactFilters from '@/components/filters/CompactFilters';
+import EsdataLogo from '@/components/ui/EsdataLogo';
 import ColonyAnalysis from '@/components/analytics/ColonyAnalysis';
 import DistributionHistogram from '@/components/charts/DistributionHistogram';
 import SegmentAnalysis from '@/components/analytics/SegmentAnalysis';
@@ -12,13 +13,10 @@ import ScatterPlotWithClustering from '@/components/charts/ScatterPlotWithCluste
 import { 
   BarChart3,
   MapPin,
-  Filter,
   TrendingUp,
-  PieChart,
   Layers,
   Target,
-  Brain,
-  Zap
+  Brain
 } from 'lucide-react';
 
 interface FilterState {
@@ -163,21 +161,6 @@ export function MarketIntelligence() {
     }
   ];
 
-  const operationConfig = {
-    venta: {
-      title: 'Inteligencia de Mercado - Venta',
-      color: '#3b82f6',
-      icon: '🏠'
-    },
-    renta: {
-      title: 'Inteligencia de Mercado - Renta',
-      color: '#10b981',
-      icon: '🔑'
-    }
-  };
-
-  const config = operationConfig[currentOperation];
-
   const viewButtons = [
     { key: 'overview', label: 'Resumen Ejecutivo', icon: Brain },
     { key: 'colonies', label: 'Análisis por Colonias', icon: MapPin },
@@ -211,20 +194,20 @@ export function MarketIntelligence() {
 
   return (
     <div className="space-y-6">
-      {/* Header con nueva paleta profesional */}
+      {/* Header reorganizado */}
       <div className="bg-gradient-to-r from-primary-500 to-primary-700 rounded-lg shadow-lg text-white p-6 animate-fade-in">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3 animate-slide-up">
-              <div className="p-2 bg-white bg-opacity-20 rounded-lg backdrop-blur-xs">
-                <Zap size={32} className="text-white" />
-              </div>
-              {config.title}
-            </h1>
-            <p className="text-primary-100 mt-2 text-lg animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              Análisis avanzado de inteligencia inmobiliaria para profesionales de la ZMG
+          <div className="flex items-center gap-4">
+            <EsdataLogo size="lg" className="text-white" />
+          </div>
+          <div className="text-right animate-slide-up">
+            <h2 className="text-xl font-semibold text-primary-100">
+              Zona Metropolitana de Guadalajara
+            </h2>
+            <p className="text-sm text-primary-200 mt-1">
+              Análisis avanzado de inteligencia inmobiliaria
             </p>
-            <div className="flex items-center gap-4 mt-3 text-sm text-primary-200">
+            <div className="flex items-center justify-end gap-4 mt-2 text-sm text-primary-200">
               <span className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-accent-400 rounded-full animate-pulse-soft"></div>
                 Datos en tiempo real
@@ -233,24 +216,13 @@ export function MarketIntelligence() {
               <span>Actualizado: {new Date().toLocaleDateString('es-MX')}</span>
             </div>
           </div>
-          <div className="text-right animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <div className="text-6xl mb-2 drop-shadow-lg">{config.icon}</div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-3 backdrop-blur-xs">
-              <div className="text-2xl font-bold">
-                {overview?.data.totalProperties?.toLocaleString('es-MX') || '0'}
-              </div>
-              <div className="text-xs text-primary-200">propiedades analizadas</div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Filtros Avanzados */}
-      <AdvancedFilters
+      {/* Filtros Compactos y Fijos */}
+      <CompactFilters
         filters={filters}
         onFiltersChange={handleFiltersChange}
-        onApplyFilters={handleApplyFilters}
-        onClearFilters={handleClearFilters}
         loading={overviewLoading}
       />
 
@@ -413,7 +385,7 @@ export function MarketIntelligence() {
               title="Distribución de Precios"
               variable="precios"
               loading={priceHistLoading}
-              color={config.color}
+              color="#1a365d"
             />
             
             <DistributionHistogram
@@ -421,7 +393,7 @@ export function MarketIntelligence() {
               title="Distribución de Superficie"
               variable="superficie"
               loading={surfaceHistLoading}
-              color={config.color}
+              color="#1a365d"
             />
           </div>
 
@@ -431,7 +403,7 @@ export function MarketIntelligence() {
             variable="pxm2"
             height={400}
             loading={pxm2HistLoading}
-            color={config.color}
+            color="#1a365d"
           />
         </div>
       )}
