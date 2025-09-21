@@ -1,0 +1,308 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ListingProcessed {
+  id            String   @id @default(cuid())
+  externalId    String?  @unique @map("external_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  // Metadatos
+  source        String   // 'inmuebles24', 'vivanuncios', etc.
+  scrapeDate    DateTime @map("scrape_date")
+  dataVersion   String   @default("v1.0") @map("data_version")
+  
+  // Clasificación
+  operation     String   // 'venta', 'renta', 'remate'
+  propertyType  String   @map("property_type") // 'departamento', 'casa', etc.
+  propertySubtype String? @map("property_subtype") // 'penthouse', 'duplex', etc.
+  
+  // Ubicación
+  city          String
+  municipality  String
+  colony        String?
+  neighborhood  String?
+  streetAddress String?  @map("street_address")
+  postalCode    String?  @map("postal_code")
+  location      Unsupported("geometry(Point, 4326)")?
+  locationAccuracy String? @default("approximate") @map("location_accuracy")
+  
+  // Características físicas
+  price         Decimal  @db.Decimal(12, 2)
+  currency      String   @default("MXN")
+  surfaceTotalM2 Decimal? @map("surface_total_m2") @db.Decimal(8, 2)
+  surfaceBuiltM2 Decimal? @map("surface_built_m2") @db.Decimal(8, 2)
+  surfaceLandM2  Decimal? @map("surface_land_m2") @db.Decimal(8, 2)
+  pricePerSqm   Decimal? @map("price_per_sqm") @db.Decimal(10, 2)
+  
+  // Habitabilidad
+  bedrooms      Int?
+  bathrooms     Decimal? @db.Decimal(3, 1)
+  halfBathrooms Int?     @default(0) @map("half_bathrooms")
+  parkingSpots  Int?     @default(0) @map("parking_spots")
+  storageRooms  Int?     @default(0) @map("storage_rooms")
+  
+  // Características del inmueble
+  ageYears      Int?     @map("age_years")
+  constructionYear Int?  @map("construction_year")
+  levels        Int?     @default(1)
+  floorNumber   Int?     @map("floor_number")
+  totalFloors   Int?     @map("total_floors")
+  
+  // Amenidades y servicios (JSON)
+  amenities     Json     @default("[]")
+  services      Json     @default("[]")
+  
+  // Análisis y clasificación
+  isOutlier     Boolean  @default(false) @map("is_outlier")
+  outlierReason String?  @map("outlier_reason")
+  priceStratum  String?  @map("price_stratum")
+  surfaceStratum String? @map("surface_stratum")
+  marketSegment String?  @map("market_segment")
+  
+  // Métricas calculadas
+  affordabilityIndex Decimal? @map("affordability_index") @db.Decimal(5, 2)
+  investmentScore    Decimal? @map("investment_score") @db.Decimal(3, 1)
+  liquidityScore     Decimal? @map("liquidity_score") @db.Decimal(3, 1)
+  
+  // Control de calidad
+  dataQualityScore Decimal? @default(1.0) @map("data_quality_score") @db.Decimal(3, 2)
+  missingFields    Int?     @default(0) @map("missing_fields")
+  validationErrors Json?    @default("[]") @map("validation_errors")
+  
+  @@map("listings_processed")
+  @@index([operation, propertyType, city, municipality])
+  @@index([price, pricePerSqm])
+  @@index([bedrooms, bathrooms, surfaceBuiltM2])
+  @@index([createdAt, scrapeDate])
+  @@index([colony, municipality])
+}
+
+model MarketStats {
+  id           String   @id @default(cuid())
+  
+  // Dimensiones de agrupación
+  geoLevel     String   @map("geo_level") // 'zmg', 'city', 'municipality', 'colony'
+  geoId        String   @map("geo_id")
+  geoName      String   @map("geo_name")
+  propertyType String?  @map("property_type")
+  operation    String?
+  period       DateTime? // YYYY-MM-01 para series temporales
+  periodMonth  DateTime? @map("period_month") // Para series mensuales
+  
+  // Conteos
+  countTotal   Int      @default(0) @map("count_total")
+  countActive  Int?     @default(0) @map("count_active")
+  countOutliers Int?    @default(0) @map("count_outliers")
+  countNew30d  Int?     @default(0) @map("count_new_30d")
+  
+  // Estadísticos de PRECIO
+  priceMean    Decimal? @map("price_mean") @db.Decimal(12, 2)
+  priceMedian  Decimal? @map("price_median") @db.Decimal(12, 2)
+  priceMode    Decimal? @map("price_mode") @db.Decimal(12, 2)
+  priceStd     Decimal? @map("price_std") @db.Decimal(12, 2)
+  priceMin     Decimal? @map("price_min") @db.Decimal(12, 2)
+  priceMax     Decimal? @map("price_max") @db.Decimal(12, 2)
+  priceP10     Decimal? @map("price_p10") @db.Decimal(12, 2)
+  priceP25     Decimal? @map("price_p25") @db.Decimal(12, 2)
+  priceP75     Decimal? @map("price_p75") @db.Decimal(12, 2)
+  priceP90     Decimal? @map("price_p90") @db.Decimal(12, 2)
+  priceIqr     Decimal? @map("price_iqr") @db.Decimal(12, 2)
+  priceCv      Decimal? @map("price_cv") @db.Decimal(5, 4)
+  priceSkewness Decimal? @map("price_skewness") @db.Decimal(6, 4)
+  priceKurtosis Decimal? @map("price_kurtosis") @db.Decimal(6, 4)
+  
+  // Estadísticos de SUPERFICIE
+  surfaceMean  Decimal? @map("surface_mean") @db.Decimal(8, 2)
+  surfaceMedian Decimal? @map("surface_median") @db.Decimal(8, 2)
+  surfaceStd   Decimal? @map("surface_std") @db.Decimal(8, 2)
+  surfaceMin   Decimal? @map("surface_min") @db.Decimal(8, 2)
+  surfaceMax   Decimal? @map("surface_max") @db.Decimal(8, 2)
+  surfaceP25   Decimal? @map("surface_p25") @db.Decimal(8, 2)
+  surfaceP75   Decimal? @map("surface_p75") @db.Decimal(8, 2)
+  surfaceIqr   Decimal? @map("surface_iqr") @db.Decimal(8, 2)
+  
+  // Estadísticos de PRECIO POR M²
+  pxm2Mean     Decimal? @map("pxm2_mean") @db.Decimal(10, 2)
+  pxm2Median   Decimal? @map("pxm2_median") @db.Decimal(10, 2)
+  pxm2Std      Decimal? @map("pxm2_std") @db.Decimal(10, 2)
+  pxm2Min      Decimal? @map("pxm2_min") @db.Decimal(10, 2)
+  pxm2Max      Decimal? @map("pxm2_max") @db.Decimal(10, 2)
+  pxm2P25      Decimal? @map("pxm2_p25") @db.Decimal(10, 2)
+  pxm2P75      Decimal? @map("pxm2_p75") @db.Decimal(10, 2)
+  pxm2Iqr      Decimal? @map("pxm2_iqr") @db.Decimal(10, 2)
+  
+  // Métricas de mercado
+  absorptionRate Decimal? @map("absorption_rate") @db.Decimal(5, 4)
+  daysOnMarketAvg Int?    @map("days_on_market_avg")
+  priceAppreciation30d Decimal? @map("price_appreciation_30d") @db.Decimal(6, 4)
+  priceAppreciation90d Decimal? @map("price_appreciation_90d") @db.Decimal(6, 4)
+  priceAppreciation1y  Decimal? @map("price_appreciation_1y") @db.Decimal(6, 4)
+  
+  // Metadatos
+  calculationDate DateTime @default(now()) @map("calculation_date")
+  dataVersion     String   @default("v1.0") @map("data_version")
+  
+  @@map("market_stats")
+  @@unique([geoLevel, geoId, propertyType, operation, periodMonth])
+  @@index([geoLevel, geoId, propertyType, operation])
+  @@index([periodMonth])
+  @@index([period])
+}
+
+model CorrelationMatrix {
+  id                String   @id @default(cuid())
+  
+  // Contexto
+  segmentKey        String   @unique @map("segment_key")
+  segmentDescription String? @map("segment_description")
+  propertyType      String?  @map("property_type")
+  operation         String?
+  geoFilter         String?  @map("geo_filter")
+  
+  // Variables incluidas
+  variables         Json     // ['price', 'surface_m2', 'bedrooms', ...]
+  
+  // Matriz de correlación (formato compacto)
+  correlationData   Json     @map("correlation_data") // [{var1, var2, pearson_r, spearman_rho, p_value}]
+  
+  // Metadatos estadísticos
+  sampleSize        Int      @map("sample_size")
+  significantPairs  Int?     @map("significant_pairs")
+  maxCorrelation    Decimal? @map("max_correlation") @db.Decimal(4, 3)
+  minCorrelation    Decimal? @map("min_correlation") @db.Decimal(4, 3)
+  
+  // Control
+  calculatedAt      DateTime @default(now()) @map("calculated_at")
+  expiresAt         DateTime @map("expires_at")
+  
+  @@map("correlation_matrices")
+}
+
+model ClusterAnalysis {
+  id                String   @id @default(cuid())
+  
+  // Configuración del clustering
+  algorithm         String   // 'kmeans', 'hdbscan', 'dbscan'
+  targetLevel       String   @map("target_level") // 'colony', 'listing'
+  features          Json     // variables usadas
+  parameters        Json?    // parámetros del algoritmo
+  
+  // Resultados
+  nClusters         Int      @map("n_clusters")
+  silhouetteScore   Decimal? @map("silhouette_score") @db.Decimal(4, 3)
+  calinskiHarabaszScore Decimal? @map("calinski_harabasz_score") @db.Decimal(10, 3)
+  daviesBouldinScore Decimal? @map("davies_bouldin_score") @db.Decimal(6, 3)
+  
+  // Clusters identificados
+  clusters          Json     // [{id, name, size, centroid, description, members}]
+  
+  // Metadatos
+  createdAt         DateTime @default(now()) @map("created_at")
+  sampleSize        Int?     @map("sample_size")
+  dataVersion       String?  @map("data_version")
+  
+  @@map("cluster_analysis")
+}
+
+model AmenityAnalysis {
+  id                String   @id @default(cuid())
+  
+  // Segmentación
+  propertyType      String?  @map("property_type")
+  operation         String?
+  geoLevel          String?  @map("geo_level")
+  geoId             String?  @map("geo_id")
+  
+  // Amenidad analizada
+  amenityName       String   @map("amenity_name")
+  amenityCategory   String?  @map("amenity_category")
+  
+  // Análisis estadístico
+  countWithAmenity  Int      @map("count_with_amenity")
+  countWithoutAmenity Int    @map("count_without_amenity")
+  prevalenceRate    Decimal  @map("prevalence_rate") @db.Decimal(5, 4)
+  
+  // Impacto en precio
+  priceLiftAbsolute Decimal  @map("price_lift_absolute") @db.Decimal(12, 2)
+  priceLiftPercentage Decimal @map("price_lift_percentage") @db.Decimal(6, 4)
+  priceLiftPvalue   Decimal  @map("price_lift_pvalue") @db.Decimal(10, 8)
+  confidenceIntervalLower Decimal @map("confidence_interval_lower") @db.Decimal(6, 4)
+  confidenceIntervalUpper Decimal @map("confidence_interval_upper") @db.Decimal(6, 4)
+  
+  // Estadísticos adicionales
+  medianPriceWith   Decimal? @map("median_price_with") @db.Decimal(12, 2)
+  medianPriceWithout Decimal? @map("median_price_without") @db.Decimal(12, 2)
+  effectSize        Decimal? @map("effect_size") @db.Decimal(4, 3)
+  
+  // Control
+  calculatedAt      DateTime @default(now()) @map("calculated_at")
+  sampleSize        Int?     @map("sample_size")
+  
+  @@map("amenity_analysis")
+  @@unique([propertyType, operation, geoLevel, geoId, amenityName])
+}
+
+model HistogramBins {
+  id            String   @id @default(cuid())
+  
+  // Contexto
+  variable      String   // 'price', 'surface', 'pxm2'
+  geoLevel      String   @map("geo_level")
+  geoId         String   @map("geo_id")
+  propertyType  String?  @map("property_type")
+  operation     String?
+  
+  // Bins calculados
+  binEdges      Json     @map("bin_edges") // Array de decimales
+  binCounts     Json     @map("bin_counts") // Array de enteros
+  binLabels     Json     @map("bin_labels") // Array de strings
+  
+  // Metadatos
+  method        String   @default("freedman_diaconis")
+  totalCount    Int      @map("total_count")
+  calculatedAt  DateTime @default(now()) @map("calculated_at")
+  
+  @@map("histogram_bins")
+  @@unique([variable, geoLevel, geoId, propertyType, operation])
+}
+
+model GeographicBoundary {
+  id            String   @id @default(cuid())
+  
+  // Identificación
+  geoType       String   @map("geo_type") // 'colony', 'municipality', 'city'
+  geoId         String   @map("geo_id")
+  name          String
+  officialName  String?  @map("official_name")
+  
+  // Jerarquía geográfica
+  parentId      String?  @map("parent_id")
+  city          String?
+  municipality  String?
+  state         String?  @default("Jalisco")
+  
+  // Geometría (como JSON por simplicidad)
+  boundary      Json     // GeoJSON MultiPolygon
+  centroidLat   Float?   @map("centroid_lat")
+  centroidLon   Float?   @map("centroid_lon")
+  areaKm2       Float?   @map("area_km2")
+  
+  // Metadatos
+  source        String?  // 'inegi', 'manual', etc.
+  confidenceLevel String? @default("high") @map("confidence_level")
+  lastUpdated   DateTime @default(now()) @map("last_updated")
+  
+  @@map("geographic_boundaries")
+  @@unique([geoType, geoId])
+  @@index([geoType, name])
+}

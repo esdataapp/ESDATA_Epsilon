@@ -1,0 +1,4 @@
+﻿id,PaginaWeb,Ciudad,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,Banos,precio,mantenimiento,Colonia,longitud,latitud,tiempo_publicacion,Banos_totales,antigüedad_icon,PxM2
+Zap-Alic_Cas-004M-177_03-02-02_TALEN-10341-20786,Zapopan,Alicante,Venta,Casa,177,3.0,2.0,2.5,4425000,25000.0,1100.0,-103.410373,20.786614,60.0,0,,25000.0
+Zap-Alic_Cas-004M-180_03-04-02_TALEN-10341-20786,Zapopan,Alicante,Venta,Casa,180,3.0,2.0,4.0,4800000,26666.67,1100.0,-103.410373,20.786614,60.0,0,,26666.667
+Zap-Alic_Cas-004M-180_03-04-02_TALEN-10341-20786,Zapopan,Alicante,Venta,Casa,180,3.0,2.0,4.0,4700000,26111.11,1100.0,-103.410373,20.786614,60.0,0,,26111.111

@@ -1,0 +1,6 @@
+﻿id,PaginaWeb,Ciudad,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,Banos,precio,mantenimiento,Colonia,longitud,latitud,tiempo_publicacion,Banos_totales,antigüedad_icon,PxM2
+Zap-Ciud_Dep-003M-063_01-01-01_SMBAR-10344-20686,Zapopan,Ciudad Granja,Venta,Departamento,63,1.0,1.0,1.0,3835000,60873.02,2000.0,-103.444023,20.686333,287.0,0,,60873.016
+Zap-Ciud_Dep-005M-117_02-02-01_Eliza-10344-20674,Zapopan,Ciudad Granja,Venta,Departamento,117,2.0,1.0,2.0,5450000,46581.2,2000.0,-103.447956,20.674676,199.0,13,,46581.197
+Zap-Ciud_Dep-002M-044_01-01-01_CityR-10345-20677,Zapopan,Ciudad Granja,Venta,Departamento,44,1.0,1.0,1.0,2650000,60227.27,2000.0,-103.452874,20.677216,161.0,2,,60227.273
+Zap-Ciud_Dep-003M-044_01-01-01_GRECI-10345-20677,Zapopan,Ciudad Granja,Venta,Departamento,44,1.0,1.0,1.0,3300000,75000.0,2000.0,-103.452874,20.677216,43.0,3,,75000.0
+Zap-Ciud_Dep-002M-051_02-02-01_Beker-10344-20681,Zapopan,Ciudad Granja,Venta,Departamento,51,2.0,1.0,2.0,2850000,55882.35,2000.0,-103.44544,20.681927,107.0,1,,55882.353

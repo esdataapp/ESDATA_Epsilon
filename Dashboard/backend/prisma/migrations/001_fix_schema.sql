@@ -1,0 +1,62 @@
+-- Migración para corregir schema según revisiones
+
+-- 1. Corregir tipo geoespacial en listings_processed
+ALTER TABLE listings_processed 
+  DROP COLUMN IF EXISTS location;
+
+ALTER TABLE listings_processed 
+  ADD COLUMN location geometry(Point, 4326);
+
+-- Recrear índice espacial
+CREATE INDEX idx_listings_location ON listings_processed USING GIST (location);
+
+-- 2. Agregar period_month a market_stats
+ALTER TABLE market_stats 
+  ADD COLUMN period_month DATE;
+
+-- Recrear constraint único
+ALTER TABLE market_stats 
+  DROP CONSTRAINT IF EXISTS market_stats_geo_level_geo_id_property_type_operation_key;
+
+ALTER TABLE market_stats 
+  ADD CONSTRAINT market_stats_unique_key 
+  UNIQUE (geo_level, geo_id, property_type, operation, period_month);
+
+-- 3. Crear tabla de bins para histogramas
+CREATE TABLE histogram_bins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  
+  -- Contexto
+  variable VARCHAR(50) NOT NULL,
+  geo_level VARCHAR(20) NOT NULL,
+  geo_id VARCHAR(100) NOT NULL,
+  property_type VARCHAR(30),
+  operation VARCHAR(20),
+  
+  -- Bins calculados
+  bin_edges DECIMAL[] NOT NULL,
+  bin_counts INTEGER[] NOT NULL,
+  bin_labels TEXT[] NOT NULL,
+  
+  -- Metadatos
+  method VARCHAR(20) DEFAULT 'freedman_diaconis',
+  total_count INTEGER NOT NULL,
+  calculated_at TIMESTAMP DEFAULT NOW(),
+  
+  UNIQUE(variable, geo_level, geo_id, property_type, operation)
+);
+
+-- 4. Índices adicionales para performance
+CREATE INDEX idx_listings_filters ON listings_processed 
+  (operation, property_type, colony, price_stratum);
+
+CREATE INDEX idx_listings_price_range ON listings_processed 
+  (price, price_per_sqm) WHERE is_outlier = false;
+
+CREATE INDEX idx_market_stats_period ON market_stats (period_month DESC);
+
+-- 5. Extensión para búsqueda de texto (colonias)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_listings_colony_search ON listings_processed 
+  USING gin (colony gin_trgm_ops);

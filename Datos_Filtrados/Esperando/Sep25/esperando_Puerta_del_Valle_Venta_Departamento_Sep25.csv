@@ -1,0 +1,4 @@
+﻿id,PaginaWeb,Ciudad,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,Banos,precio,mantenimiento,Colonia,longitud,latitud,tiempo_publicacion,Banos_totales,antigüedad_icon,PxM2
+Zap-Puer_Dep-005M-085_02-02-02_VEOCo-10342-20725,Zapopan,Puerta del Valle,Venta,Departamento,85,2.0,2.0,2.0,5165600,60771.76,2100.0,-103.420218,20.725473,260.0,0,,60771.765
+Zap-Puer_Dep-005M-085_02-02-02_SMBAR-10342-20724,Zapopan,Puerta del Valle,Venta,Departamento,85,2.0,2.0,2.0,5940000,69882.35,2100.0,-103.420312,20.724888,61.0,0,,69882.353
+Zap-Puer_Dep-005M-085_02-02-02_Estin-10342-20724,Zapopan,Puerta del Valle,Venta,Departamento,85,2.0,2.0,2.0,5100000,60000.0,2100.0,-103.420312,20.724888,244.0,2,,60000.0

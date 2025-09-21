@@ -34,7 +34,7 @@ CANONICAL_FEATURES = [
 ]
 CANONICAL_SET = set(CANONICAL_FEATURES)
 
-# === Listas marketing (Paso 13) ===
+# === Listas marketing===
 DESC_TERMS = [
  'moderno','contemporaneo','nuevo','espectacular','increible','hermoso','elegante','lujoso','exclusivo','premium','impecable','comodo',
  'confortable','acogedor','funcional','practico','espacioso','unico','especial','extraordinario','excepcional','ideal','perfecto','centrico',
