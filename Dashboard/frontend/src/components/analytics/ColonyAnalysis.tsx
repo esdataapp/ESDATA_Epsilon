@@ -1,6 +1,6 @@
-import React from 'react';
-import { MapPin, TrendingUp, TrendingDown, Minus, DollarSign, Square } from 'lucide-react';
-import { SimpleBarChart } from '../charts/SimpleBarChart';
+import React, { useState } from 'react';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Square, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ColonyData {
   colonia: string;
@@ -26,6 +26,12 @@ const ColonyAnalysis: React.FC<ColonyAnalysisProps> = ({
   loading = false,
   operacion
 }) => {
+  const [selectedColonies, setSelectedColonies] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Obtener todas las colonias disponibles
+  const allColonies = data.map(item => item.colonia);
+
   const formatPrice = (value: number) => {
     if (operacion === 'renta') {
       return new Intl.NumberFormat('es-MX', {
@@ -47,14 +53,59 @@ const ColonyAnalysis: React.FC<ColonyAnalysisProps> = ({
     }).format(value);
   };
 
+  // Funciones de control para selección de colonias
+  const handleColonyToggle = (colonia: string) => {
+    setSelectedColonies(prev => 
+      prev.includes(colonia) 
+        ? prev.filter(c => c !== colonia)
+        : [...prev, colonia]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedColonies([...allColonies]);
+  };
+
+  const handleClearAll = () => {
+    setSelectedColonies([]);
+  };
+
+  const handleSelectByMunicipality = (municipality: string) => {
+    const coloniesInMunicipality = data
+      .filter(item => item.municipio === municipality)
+      .map(item => item.colonia);
+    setSelectedColonies(coloniesInMunicipality);
+  };
+
+  // Preparar datos para las gráficas
+  const selectedData = data.filter(item => selectedColonies.includes(item.colonia));
+
+  const priceChartData = selectedData.map(item => ({
+    colonia: item.colonia.length > 15 ? item.colonia.substring(0, 15) + '...' : item.colonia,
+    precio: item.precio_mean,
+    municipio: item.municipio
+  }));
+
+  const surfaceChartData = selectedData.map(item => ({
+    colonia: item.colonia.length > 15 ? item.colonia.substring(0, 15) + '...' : item.colonia,
+    superficie: item.superficie_mean,
+    municipio: item.municipio
+  }));
+
+  const pxm2ChartData = selectedData.map(item => ({
+    colonia: item.colonia.length > 15 ? item.colonia.substring(0, 15) + '...' : item.colonia,
+    pxm2: item.precio_por_m2_mean,
+    municipio: item.municipio
+  }));
+
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case 'up':
-        return <TrendingUp size={16} className="text-green-500" />;
+        return <TrendingUp className="text-green-600" size={16} />;
       case 'down':
-        return <TrendingDown size={16} className="text-red-500" />;
+        return <TrendingDown className="text-red-600" size={16} />;
       default:
-        return <Minus size={16} className="text-gray-500" />;
+        return <Minus className="text-gray-600" size={16} />;
     }
   };
 
@@ -99,180 +150,217 @@ const ColonyAnalysis: React.FC<ColonyAnalysisProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Gráfica de Top Colonias */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <MapPin size={20} className="text-blue-600" />
-            Top Colonias por Precio/m²
-          </h3>
-          <span className="text-sm text-gray-500">
-            {operacion === 'venta' ? 'Venta' : 'Renta'}
-          </span>
-        </div>
-        
-        <SimpleBarChart
-          data={chartData}
-          height={400}
-          color="#3b82f6"
-          loading={false}
-        />
-      </div>
+      {/* Panel de Control */}
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Controles de Selección */}
+          <div className="lg:w-1/3">
+            <h3 className="text-lg font-semibold text-neutral-900 mb-4">
+              Seleccionar Colonias ({allColonies.length} disponibles)
+            </h3>
+            
+            {/* Barra de Búsqueda */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Buscar colonia..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            
+            {/* Botones de Control Rápido */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
+              >
+                Todas ({allColonies.length})
+              </button>
+              <button
+                onClick={handleClearAll}
+                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
+              >
+                Limpiar
+              </button>
+              <button
+                onClick={() => handleSelectByMunicipality('Guadalajara')}
+                className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors"
+              >
+                Solo Gdl
+              </button>
+              <button
+                onClick={() => handleSelectByMunicipality('Zapopan')}
+                className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors"
+              >
+                Solo Zap
+              </button>
+            </div>
 
-      {/* Tabla detallada de colonias */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Análisis Detallado por Colonia
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Métricas clave de las principales colonias de la ZMG
-          </p>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Colonia
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Municipio
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Propiedades
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Precio Promedio
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Precio/m²
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Superficie Prom.
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tendencia
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {topColonies.map((colony, index) => (
-                <tr key={`${colony.colonia}-${colony.municipio}`} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-blue-600">
-                          {index + 1}
-                        </span>
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {colony.colonia}
+            {/* Lista de Colonias */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {allColonies
+                .filter(colonia => 
+                  colonia.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((colonia: string) => {
+                  const coloniaData = data.find(d => d.colonia === colonia);
+                  const isSelected = selectedColonies.includes(colonia);
+                  
+                  return (
+                    <label
+                      key={colonia}
+                      className="flex items-center space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleColonyToggle(colonia)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {colonia}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {coloniaData?.municipio} • {coloniaData?.count} propiedades
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      {colony.municipio}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {colony.count.toLocaleString('es-MX')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatPrice(colony.precio_mean)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Mediana: {formatPrice(colony.precio_median)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatPrice(colony.precio_por_m2_mean)}/m²
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Mediana: {formatPrice(colony.precio_por_m2_median)}/m²
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {Math.round(colony.superficie_mean)}m²
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getTrendColor(colony.trend)}`}>
-                      {getTrendIcon(colony.trend)}
-                      {colony.change_percent !== 0 && (
-                        <span>{Math.abs(colony.change_percent).toFixed(1)}%</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Insights de colonias */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <TrendingUp size={20} className="text-green-600" />
+                    </label>
+                  );
+                })}
             </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Colonia Premium</h4>
-              <p className="text-sm text-gray-600">
-                {topColonies[0]?.colonia || 'N/A'}
-              </p>
-              <p className="text-xs text-gray-500">
-                {formatPrice(topColonies[0]?.precio_por_m2_mean || 0)}/m²
-              </p>
+
+            {/* Contador */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <strong>{selectedColonies.length}</strong> colonias seleccionadas
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <DollarSign size={20} className="text-blue-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Precio Promedio ZMG</h4>
-              <p className="text-sm text-gray-600">
-                {formatPrice(
-                  data.reduce((sum, colony) => sum + colony.precio_mean, 0) / data.length || 0
-                )}
-              </p>
-              <p className="text-xs text-gray-500">
-                {data.length} colonias analizadas
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Square size={20} className="text-purple-600" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900">Superficie Promedio</h4>
-              <p className="text-sm text-gray-600">
-                {Math.round(
-                  data.reduce((sum, colony) => sum + colony.superficie_mean, 0) / data.length || 0
-                )}m²
-              </p>
-              <p className="text-xs text-gray-500">
-                Promedio general ZMG
-              </p>
-            </div>
+          {/* Vista Previa */}
+          <div className="lg:w-2/3">
+            {selectedColonies.length === 0 ? (
+              <div className="bg-white rounded-lg border p-4 h-64 flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-4">📊</div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    Gráficas Comparativas
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Selecciona colonias para ver comparaciones de precios, superficies y precio/m²
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                  Comparación de {selectedColonies.length} Colonias
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Las gráficas aparecerán abajo con los datos seleccionados
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Gráficas Comparativas */}
+      {selectedColonies.length > 0 && (
+        <>
+          {/* Gráfica de Comparación de Precios */}
+          <div className="bg-white rounded-lg border p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <DollarSign size={20} className="text-green-600" />
+              Comparación de Precios Promedio
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={priceChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="colonia" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  fontSize={12}
+                />
+                <YAxis 
+                  tickFormatter={(value) => formatPrice(value)}
+                  fontSize={12}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [formatPrice(value), 'Precio Promedio']}
+                  labelStyle={{ color: '#374151' }}
+                />
+                <Bar dataKey="precio" fill="#10B981" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gráfica de Comparación de Superficies */}
+          <div className="bg-white rounded-lg border p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Square size={20} className="text-blue-600" />
+              Comparación de Superficies Promedio
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={surfaceChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="colonia" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  fontSize={12}
+                />
+                <YAxis 
+                  tickFormatter={(value) => `${value}m²`}
+                  fontSize={12}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`${Math.round(value)}m²`, 'Superficie Promedio']}
+                  labelStyle={{ color: '#374151' }}
+                />
+                <Bar dataKey="superficie" fill="#3B82F6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gráfica de Comparación de Precio/m² */}
+          <div className="bg-white rounded-lg border p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <BarChart3 size={20} className="text-purple-600" />
+              Comparación de Precio por m²
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={pxm2ChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="colonia" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  fontSize={12}
+                />
+                <YAxis 
+                  tickFormatter={(value) => `$${(value/1000).toFixed(0)}K`}
+                  fontSize={12}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [formatPrice(value) + '/m²', 'Precio por m²']}
+                  labelStyle={{ color: '#374151' }}
+                />
+                <Bar dataKey="pxm2" fill="#8B5CF6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
     </div>
   );
 };

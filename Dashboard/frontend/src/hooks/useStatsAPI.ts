@@ -79,11 +79,21 @@ export function useOverview() {
   return useQuery({
     queryKey: ['overview', currentOperation],
     queryFn: async (): Promise<OverviewData> => {
-      const response = await fetch(`${API_BASE}/stats/overview?operacion=${currentOperation}`);
+      console.log(`🔍 Fetching overview data for operation: ${currentOperation}`);
+      const url = `${API_BASE}/stats/overview?operacion=${currentOperation}`;
+      console.log(`📡 Request URL: ${url}`);
+      
+      const response = await fetch(url);
+      console.log(`📊 Response status: ${response.status}`);
+      
       if (!response.ok) {
-        throw new Error('Error fetching overview data');
+        console.error(`❌ Error response: ${response.status} ${response.statusText}`);
+        throw new Error(`Error fetching overview data: ${response.status}`);
       }
-      return response.json();
+      
+      const data = await response.json();
+      console.log('✅ Overview data received:', data);
+      return data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutos
     refetchOnWindowFocus: false,

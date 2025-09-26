@@ -1,5 +1,5 @@
-﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2,Fecha_Scrap
-Gdl-Jard_CasC-023M-600_04-04-05_Consu-10339-20670,Inm24,Gdl,Jardines de Los Arcos,Ven,CasC,600.0,4.0,5.0,23500000.0,,-103.399015,20.670252,,4.5,,39166.66666666666,
-Gdl-Monr_CasC-028M-430_03-03-04_HHase-10339-20683,Inm24,Gdl,Monraz,Ven,CasC,430.0,3.0,4.0,28000000.0,,-103.393429,20.683661,,3.5,,65116.27906976744,
-Gdl-Vall_CasC-019M-390_04-05-05_MAGNA-10338-20674,Inm24,Gdl,Vallarta,Ven,CasC,390.0,4.0,5.0,19975000.0,,-103.385973,20.674477,,5.5,0.0,51217.94871794872,
-Gdl-Vict_CasC-011M-483_04-03-03_MOOBI-10339-20647,Inm24,Gdl,Victoria,Ven,CasC,483.0,4.0,3.0,11900000.0,,-103.396721,20.647268,,3.0,,24637.681159420288,
+﻿id,PaginaWeb,Ciudad,Colonia,operacion,tipo_propiedad,area_m2,recamaras,estacionamientos,precio,mantenimiento,longitud,latitud,tiempo_publicacion,Banos_totales,antiguedad_icon,PxM2
+Gdl-Jard_CasC-023M-600_04-04-05_Consu-10339-20670,Inm24,Gdl,Jardines de Los Arcos,Ven,CasC,600,4.0,5.0,23500000,,-103.399015,20.670252,,4.5,,39166.66667
+Gdl-Monr_CasC-028M-430_03-03-04_HHase-10339-20683,Inm24,Gdl,Monraz,Ven,CasC,430,3.0,4.0,28000000,,-103.393429,20.683661,,3.5,,65116.27907
+Gdl-Vall_CasC-019M-390_04-05-05_MAGNA-10338-20674,Inm24,Gdl,Vallarta,Ven,CasC,390,4.0,5.0,19975000,,-103.385973,20.674477,,5.5,0.0,51217.94872
+Gdl-Vict_CasC-011M-483_04-03-03_MOOBI-10339-20647,Inm24,Gdl,Victoria,Ven,CasC,483,4.0,3.0,11900000,,-103.396721,20.647268,,3.0,,24637.68116
